@@ -12,6 +12,10 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "typeorm": "ts-node -r tsconfig-paths/register node_modules/typeorm/cli.js",
+    "migration:generate": "npm run typeorm -- migration:generate -d src/infra/database/dataSource.ts",
+    "migration:run": "npm run typeorm -- migration:run -d src/infra/database/dataSource.ts",
+    "migration:revert": "npm run typeorm -- migration:revert -d src/infra/database/dataSource.ts",
     "prepare": "husky"
   },
   "keywords": [],
@@ -52,6 +56,9 @@
     "dotenv": "^17.4.2",
     "envalid": "^8.2.0",
     "fastify": "^5.12.0",
-    "pino": "^10.3.1"
+    "pg": "^8.23.0",
+    "pino": "^10.3.1",
+    "reflect-metadata": "^0.2.2",
+    "typeorm": "^1.1.0"
   }
 }
