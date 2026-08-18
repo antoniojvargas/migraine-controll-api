@@ -11,6 +11,8 @@
       "@/*": ["src/*"]
     },
     "strict": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
     "isolatedModules": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

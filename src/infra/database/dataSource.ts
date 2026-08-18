@@ -9,6 +9,7 @@ export const dataSource = new DataSource({
   username: envs.DB_USER,
   password: envs.DB_PASSWORD,
   database: envs.DB_NAME,
+  uuidExtension: 'pgcrypto',
   entities: ['src/infra/database/entities/**/*.ts'],
   migrations: ['src/infra/database/migrations/**/*.ts'],
   synchronize: false,
