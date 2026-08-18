@@ -11,7 +11,7 @@ npm run migration:generate -- src/infra/database/migrations/<Descripcion>
 El CLI agrega el timestamp automáticamente, de modo que el archivo resultante
 sigue el patrón `Descripcion<timestamp>.ts` (ej. `CreateUsers1735678901234.ts`).
 Usa **PascalCase** para la descripción y resúmela en el nombre (ej.
-`CreateUsers`, `AddCefalySessions`, `DropLegacyColumn`).
+`CreateUsers`, `AddUserSessions`, `DropLegacyColumn`).
 
 ## Comandos
 

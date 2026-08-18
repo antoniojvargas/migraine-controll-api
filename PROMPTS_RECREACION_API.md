@@ -58,7 +58,7 @@ has commit y push
 has commit y push
 
 **10.** Escribe un `README.md` inicial describiendo visión del producto (tracking de
-migrañas, tratamientos preventivos/agudos, dispositivo Cefaly, perfiles de usuario),
+migrañas, tratamientos preventivos/agudos, perfiles de usuario),
 stack tecnológico y cómo levantar el entorno local.
 has commit y push
 

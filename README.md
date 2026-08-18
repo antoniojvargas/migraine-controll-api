@@ -16,10 +16,6 @@ intensidad de sus crisis. Los pilares del producto son:
   (preventivos, con agenda y recordatorios) y de tratamientos aplicados durante una
   crisis (agudos), registrando su efectividad para ayudar al usuario y a su médico a
   ajustar el plan de tratamiento.
-- **Dispositivo Cefaly**: integración con el dispositivo de neuroestimulación Cefaly,
-  registrando las sesiones de uso (programa seleccionado, duración, intensidad máxima,
-  nivel de batería, ubicación) y vinculándolas con los registros de migraña y
-  tratamiento correspondientes.
 - **Perfiles de usuario**: cada usuario cuenta con un perfil (datos demográficos,
   idioma, dispositivos asociados) sobre el que se personalizan cuestionarios de
   onboarding, recordatorios y notificaciones relevantes (por ejemplo, síntomas
