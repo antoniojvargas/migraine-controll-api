@@ -1,11 +1,7 @@
-import Fastify from 'fastify';
+import { buildApp } from '@/factory/build-app';
 import { logger } from '@/config/logger';
 
-const app = Fastify({ loggerInstance: logger });
-
-app.get('/health', async () => {
-  return { status: 'ok' };
-});
+const app = buildApp();
 
 const start = async (): Promise<void> => {
   try {
