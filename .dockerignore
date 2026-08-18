@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+.nyc_output
+.git
+.husky
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
