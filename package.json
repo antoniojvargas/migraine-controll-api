@@ -37,5 +37,8 @@
     "*.{json,md}": [
       "prettier --write"
     ]
+  },
+  "dependencies": {
+    "fastify": "^5.12.0"
   }
 }
