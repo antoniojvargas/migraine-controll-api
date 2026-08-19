@@ -1,6 +1,26 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { envs } from '@/config/env';
+import {
+  AcuteTreatmentWorseFeedbackOptionsEntity,
+  AppVersionEntity,
+  DeviceEntity,
+  FeelingTodayEntity,
+  MigraineLogEntity,
+  PreferredAnswersEntity,
+  PreventiveTreatmentEntity,
+  PreventiveTreatmentScheduleEntity,
+  PreventiveTreatmentScheduleMetadataEntity,
+  ProfileEntity,
+  PushNotificationTokenEntity,
+  QuestionEntity,
+  SelectionEntity,
+  SessionEntity,
+  TranslationEntity,
+  UserEntity,
+  UserResponseEntity,
+  UserResponseAcuteTreatmentWorseFeedbackOptionsEntity,
+} from '@/infra/database/entities';
 
 export const dataSource = new DataSource({
   type: 'postgres',
@@ -10,7 +30,26 @@ export const dataSource = new DataSource({
   password: envs.DB_PASSWORD,
   database: envs.DB_NAME,
   uuidExtension: 'pgcrypto',
-  entities: ['src/infra/database/entities/**/*.ts'],
+  entities: [
+    AcuteTreatmentWorseFeedbackOptionsEntity,
+    AppVersionEntity,
+    DeviceEntity,
+    FeelingTodayEntity,
+    MigraineLogEntity,
+    PreferredAnswersEntity,
+    PreventiveTreatmentEntity,
+    PreventiveTreatmentScheduleEntity,
+    PreventiveTreatmentScheduleMetadataEntity,
+    ProfileEntity,
+    PushNotificationTokenEntity,
+    QuestionEntity,
+    SelectionEntity,
+    SessionEntity,
+    TranslationEntity,
+    UserEntity,
+    UserResponseEntity,
+    UserResponseAcuteTreatmentWorseFeedbackOptionsEntity,
+  ],
   migrations: ['src/infra/database/migrations/**/*.ts'],
   synchronize: false,
 });
