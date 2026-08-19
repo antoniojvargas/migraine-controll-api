@@ -6,6 +6,7 @@ import { SelectionEntity } from './selection.entity';
 import { UserEntity } from './user.entity';
 
 @Entity('user_responses')
+@Index(['user', 'question'])
 export class UserResponseEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

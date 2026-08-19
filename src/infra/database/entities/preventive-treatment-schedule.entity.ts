@@ -2,6 +2,7 @@ import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn } 
 import { PreventiveTreatmentEntity } from './preventive-treatment.entity';
 
 @Entity('preventive_treatment_schedules')
+@Index(['treatment', 'scheduledAt'])
 export class PreventiveTreatmentScheduleEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

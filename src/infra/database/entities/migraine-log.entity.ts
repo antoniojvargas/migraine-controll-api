@@ -12,6 +12,7 @@ import { UserEntity } from './user.entity';
 import { UserResponseEntity } from './user-response.entity';
 
 @Entity('migraine_logs')
+@Index(['user', 'startedAt'])
 export class MigraineLogEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

@@ -55,3 +55,28 @@ factory -> ensambla todo
 ```
 
 El dominio y los casos de uso no deben importar nada de `infra`, `adapter` ni frameworks externos.
+
+## Indexación
+
+Los índices compuestos respaldan los patrones de consulta más frecuentes y
+siguen la regla general **`(owner_id, columna_de_orden_o_filtro)`**: primero la
+columna de filtro (FK de propietario) y luego la columna que ordena o filtra
+dentro de ese propietario.
+
+Índices actuales:
+
+| Tabla                            | Índice                                    | Consulta que respalda                                   |
+| -------------------------------- | ----------------------------------------- | ------------------------------------------------------- |
+| `migraine_logs`                  | `(user_id, started_at)`                   | Historial de migrañas de un usuario ordenado por inicio |
+| `preventive_treatment_schedules` | `(preventive_treatment_id, scheduled_at)` | Agenda de un tratamiento ordenada por hora              |
+| `user_responses`                 | `(user_id, question_id)`                  | Respuestas de un usuario a una pregunta                 |
+
+Notas:
+
+- `profiles.user_id` ya queda indexado por el constraint `UNIQUE` de la relación
+  1:1 con `users`, no requiere índice adicional.
+- Las FKs individuales se indexan con `@Index()` en la propiedad de la relación;
+  los índices compuestos de consulta se declaran con `@Index` a nivel de clase
+  de la entidad.
+- No se agregan índices especulativos: solo los que respaldan consultas reales
+  o patrones de acceso conocidos.
