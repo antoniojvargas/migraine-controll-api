@@ -1,5 +1,6 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { MigraineLogEntity } from './migraine-log.entity';
+import { PreventiveTreatmentEntity } from './preventive-treatment.entity';
 import { QuestionEntity } from './question.entity';
 import { SelectionEntity } from './selection.entity';
 import { UserEntity } from './user.entity';
@@ -34,7 +35,8 @@ export class UserResponseEntity {
   @Index()
   migraineLog!: MigraineLogEntity | null;
 
-  @Column({ type: 'uuid', name: 'preventive_treatment_id', nullable: true })
+  @ManyToOne(() => PreventiveTreatmentEntity, { nullable: true })
+  @JoinColumn({ name: 'preventive_treatment_id' })
   @Index()
-  preventiveTreatmentId!: string | null;
+  preventiveTreatment!: PreventiveTreatmentEntity | null;
 }
