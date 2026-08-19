@@ -1,4 +1,5 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { MigraineLogEntity } from './migraine-log.entity';
 import { QuestionEntity } from './question.entity';
 import { SelectionEntity } from './selection.entity';
 import { UserEntity } from './user.entity';
@@ -26,9 +27,12 @@ export class UserResponseEntity {
   @Column({ type: 'varchar', name: 'answer_text', nullable: true })
   answerText!: string | null;
 
-  @Column({ type: 'uuid', name: 'migraine_log_id', nullable: true })
+  @ManyToOne(() => MigraineLogEntity, (migraineLog) => migraineLog.userResponses, {
+    nullable: true,
+  })
+  @JoinColumn({ name: 'migraine_log_id' })
   @Index()
-  migraineLogId!: string | null;
+  migraineLog!: MigraineLogEntity | null;
 
   @Column({ type: 'uuid', name: 'preventive_treatment_id', nullable: true })
   @Index()
