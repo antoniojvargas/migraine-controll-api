@@ -62,6 +62,14 @@ export function requirePastDate(value: string | Date, field: string): Date {
   return date;
 }
 
+export function requireDate(value: string | Date, field: string): Date {
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new DomainError(`${field} has an invalid date format`);
+  }
+  return date;
+}
+
 export function optionalSemver(value: string | null | undefined, field: string): string | null {
   if (value === null || value === undefined) {
     return null;
