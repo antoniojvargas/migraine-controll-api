@@ -95,3 +95,40 @@ export function requireSupportedLanguage(value: string, supported: readonly stri
   }
   return language;
 }
+
+export function requireRange(value: number, field: string, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) {
+    throw new DomainError(`${field} must be an integer between ${min} and ${max}`);
+  }
+  return value;
+}
+
+export function requireFloatRange(value: number, field: string, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
+    throw new DomainError(`${field} must be a number between ${min} and ${max}`);
+  }
+  return value;
+}
+
+export function optionalFloatRange(
+  value: number | null | undefined,
+  field: string,
+  min: number,
+  max: number,
+): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return requireFloatRange(value, field, min, max);
+}
+
+export function requireFutureDate(value: string | Date, field: string): Date {
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new DomainError(`${field} has an invalid date format`);
+  }
+  if (date.getTime() < Date.now()) {
+    throw new DomainError(`${field} must be today or in the future`);
+  }
+  return date;
+}
