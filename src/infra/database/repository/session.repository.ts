@@ -9,6 +9,10 @@ export class SessionRepository implements RepositoryInterface<SessionEntity> {
     return this.repository.save(this.repository.create(data));
   }
 
+  async bulkCreate(data: DeepPartial<SessionEntity>[]): Promise<SessionEntity[]> {
+    return this.repository.save(this.repository.create(data));
+  }
+
   findOneBy(
     criteria: FindOptionsWhere<SessionEntity> | FindOptionsWhere<SessionEntity>[],
   ): Promise<SessionEntity | null> {

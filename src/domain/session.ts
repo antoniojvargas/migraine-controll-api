@@ -3,13 +3,13 @@ import { UpdateSessionDto } from '@/dto/update-session.dto';
 import {
   BATTERY_LEVEL_MAX,
   BATTERY_LEVEL_MIN,
-  INTENSITY_MAX,
   INTENSITY_MIN,
   LATITUDE_MAX,
   LATITUDE_MIN,
   LONGITUDE_MAX,
   LONGITUDE_MIN,
-  SESSION_DURATION_MAX,
+  PROGRAM_LIMITS,
+  PROGRAMS,
   SESSION_DURATION_MIN,
 } from './constants';
 import { DomainError } from './domain-error';
@@ -18,6 +18,7 @@ import {
   optionalSemver,
   optionalString,
   requireNonEmpty,
+  requireOneOf,
   requireRange,
 } from './validation';
 
@@ -66,18 +67,19 @@ export class Session {
 
   static createNewSession(dto: CreateSessionDto): Session {
     const deviceId = requireNonEmpty(dto.deviceId, 'deviceId');
-    const progSelected = requireNonEmpty(dto.progSelected, 'progSelected');
+    const progSelected = requireOneOf(dto.progSelected, PROGRAMS, 'progSelected');
+    const limits = PROGRAM_LIMITS[progSelected];
     const duration = requireRange(
       dto.duration,
       'duration',
       SESSION_DURATION_MIN,
-      SESSION_DURATION_MAX,
+      limits.durationMax,
     );
     const maxIntensity = requireRange(
       dto.maxIntensity,
       'maxIntensity',
       INTENSITY_MIN,
-      INTENSITY_MAX,
+      limits.intensityMax,
     );
     const batteryLevel = requireRange(
       dto.batteryLevel,
@@ -109,15 +111,20 @@ export class Session {
   }
 
   updateSession(dto: UpdateSessionDto): void {
+    const nextProgSelected =
+      dto.progSelected !== undefined
+        ? requireOneOf(dto.progSelected, PROGRAMS, 'progSelected')
+        : this._progSelected;
     if (dto.progSelected !== undefined) {
-      this._progSelected = requireNonEmpty(dto.progSelected, 'progSelected');
+      this._progSelected = nextProgSelected;
     }
+    const limits = PROGRAM_LIMITS[nextProgSelected];
     if (dto.duration !== undefined) {
       this._duration = requireRange(
         dto.duration,
         'duration',
         SESSION_DURATION_MIN,
-        SESSION_DURATION_MAX,
+        limits.durationMax,
       );
     }
     if (dto.maxIntensity !== undefined) {
@@ -125,7 +132,7 @@ export class Session {
         dto.maxIntensity,
         'maxIntensity',
         INTENSITY_MIN,
-        INTENSITY_MAX,
+        limits.intensityMax,
       );
     }
     if (dto.batteryLevel !== undefined) {
