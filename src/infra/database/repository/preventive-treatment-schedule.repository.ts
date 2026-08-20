@@ -11,6 +11,12 @@ export class PreventiveTreatmentScheduleRepository implements RepositoryInterfac
     return this.repository.save(this.repository.create(data));
   }
 
+  async bulkCreate(
+    data: DeepPartial<PreventiveTreatmentScheduleEntity>[],
+  ): Promise<PreventiveTreatmentScheduleEntity[]> {
+    return this.repository.save(this.repository.create(data));
+  }
+
   findOneBy(
     criteria:
       | FindOptionsWhere<PreventiveTreatmentScheduleEntity>

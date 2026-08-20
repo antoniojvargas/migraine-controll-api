@@ -18,6 +18,12 @@ export const LONGITUDE_MIN = -180;
 export const LONGITUDE_MAX = 180;
 export const TREATMENT_NAME_MAX_LENGTH = 100;
 
+export const RECURRENCE_TYPES = ['Day', 'Week', 'Month', 'Year'] as const;
+
+export type Recurrence = (typeof RECURRENCE_TYPES)[number];
+
+export const DEFAULT_RECURRENCE_HORIZON_DAYS = 365;
+
 export interface ProgramLimits {
   durationMax: number;
   intensityMax: number;
