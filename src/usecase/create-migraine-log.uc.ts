@@ -10,7 +10,7 @@ import { SelectionRepository } from '@/infra/database/repository/selection.repos
 import { TranslationRepository } from '@/infra/database/repository/translation.repository';
 import { MigraineLogEntity, UserResponseEntity } from '@/infra/database/entities';
 import { CreateMigraineLogInputDto } from '@/dto/create-migraine-log-input.dto';
-import { MigraineLogOutputDto } from '@/dto/migraine-log-output.dto';
+import { MigraineLogOutputDto, RecurrentSymptomOutputDto } from '@/dto/migraine-log-output.dto';
 import { handleErrorResponse } from '@/utils/handle-error-response';
 import { UseCaseInterface } from './usecase.interface';
 import { UserResponseBaseUc, ResolvedAnswer } from './user-response-base.uc';
@@ -68,6 +68,9 @@ export class CreateMigraineLogUc
       const persistedResponses = await this.userResponseRepository.bulkCreate(responseEntities);
       persistedResponses.forEach((entity, index) => domainResponses[index].assignId(entity.id));
 
+      const recurrentSymptoms = await this.detectRecurrentSymptoms(log.userId);
+      this.onRecurrentSymptomsDetected(recurrentSymptoms);
+
       return {
         id: persistedLog.id,
         userId: log.userId,
@@ -77,11 +80,38 @@ export class CreateMigraineLogUc
         startedAt: log.startedAt,
         endedAt: log.endedAt,
         responses: domainResponses.map((response) => this.toOutput(response)),
+        recurrentSymptoms,
       };
     } catch (error) {
       handleErrorResponse(error);
     }
   };
+
+  private async detectRecurrentSymptoms(userId: string): Promise<RecurrentSymptomOutputDto[]> {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const rows = await this.userResponseRepository
+      .createQueryBuilder('ur')
+      .innerJoin('ur.migraineLog', 'ml')
+      .select('ur.selection_id', 'selectionId')
+      .addSelect('ur.answer_text', 'answerText')
+      .addSelect('COUNT(*)', 'occurrences')
+      .where('ur.user_id = :userId', { userId })
+      .andWhere('ml.started_at >= :since', { since })
+      .groupBy('ur.selection_id')
+      .addGroupBy('ur.answer_text')
+      .getRawMany();
+    return rows
+      .map((row) => ({
+        selectionId: (row.selectionId as string | null) ?? null,
+        answerText: (row.answerText as string | null) ?? null,
+        occurrences: Number(row.occurrences),
+      }))
+      .filter((symptom) => symptom.occurrences >= 5);
+  }
+
+  protected onRecurrentSymptomsDetected(symptoms: RecurrentSymptomOutputDto[]): void {
+    void symptoms;
+  }
 
   private mapLogToEntity(log: MigraineLog): DeepPartial<MigraineLogEntity> {
     return {

@@ -1,5 +1,11 @@
 import { UserResponseOutputDto } from './user-response-output.dto';
 
+export interface RecurrentSymptomOutputDto {
+  selectionId: string | null;
+  answerText: string | null;
+  occurrences: number;
+}
+
 export interface MigraineLogOutputDto {
   id: string;
   userId: string;
@@ -9,4 +15,5 @@ export interface MigraineLogOutputDto {
   startedAt: Date;
   endedAt: Date | null;
   responses: UserResponseOutputDto[];
+  recurrentSymptoms: RecurrentSymptomOutputDto[];
 }
