@@ -1,4 +1,12 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { ProfileEntity } from './profile.entity';
 
 @Entity('devices')
@@ -25,4 +33,7 @@ export class DeviceEntity {
 
   @Column({ type: 'varchar', name: 'phone_os_version', nullable: true })
   phoneOsVersion!: string | null;
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt!: Date;
 }
