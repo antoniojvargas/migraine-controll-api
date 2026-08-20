@@ -25,8 +25,8 @@ export class ProfileEntity {
   @Column({ type: 'varchar', length: 6, name: 'geohash6' })
   geohash6!: string;
 
-  @Column({ type: 'varchar', name: 'app_version' })
-  appVersion!: string;
+  @Column({ type: 'varchar', name: 'app_version', nullable: true })
+  appVersion!: string | null;
 
   @Column({ type: 'boolean', name: 'has_taken_survey', default: false })
   hasTakenSurvey!: boolean;
