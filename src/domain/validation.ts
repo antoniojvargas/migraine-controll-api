@@ -72,3 +72,26 @@ export function optionalSemver(value: string | null | undefined, field: string):
   }
   return version;
 }
+
+export function requireNonNegativeInt(value: number, field: string): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw new DomainError(`${field} must be a non-negative integer`);
+  }
+  return value;
+}
+
+export function requireText(value: string, field: string, maxLength: number): string {
+  const text = requireNonEmpty(value, field);
+  if (text.length > maxLength) {
+    throw new DomainError(`${field} must not exceed ${maxLength} characters`);
+  }
+  return text;
+}
+
+export function requireSupportedLanguage(value: string, supported: readonly string[]): string {
+  const language = requireNonEmpty(value, 'languageCode').toLowerCase();
+  if (!supported.includes(language)) {
+    throw new DomainError(`languageCode must be one of: ${supported.join(', ')}`);
+  }
+  return language;
+}
