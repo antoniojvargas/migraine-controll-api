@@ -1,0 +1,9 @@
+[
+  { "key": "onboarding_aura", "type": "single", "order": 1 },
+  { "key": "onboarding_frequency", "type": "single", "order": 2 },
+  { "key": "onboarding_notes", "type": "text", "order": 3 },
+  { "key": "migraine_intensity", "type": "scale", "order": 4 },
+  { "key": "migraine_symptoms", "type": "multiple", "order": 5 },
+  { "key": "migraine_triggers", "type": "multiple", "order": 6 },
+  { "key": "migraine_notes", "type": "text", "order": 7 }
+]

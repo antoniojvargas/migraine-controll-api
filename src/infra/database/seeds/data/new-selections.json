@@ -1,0 +1,76 @@
+[
+  { "key": "sel_aura_visual", "questionKey": "onboarding_aura", "order": 1, "isCustom": false },
+  { "key": "sel_aura_sensory", "questionKey": "onboarding_aura", "order": 2, "isCustom": false },
+  { "key": "sel_aura_none", "questionKey": "onboarding_aura", "order": 3, "isCustom": false },
+
+  {
+    "key": "sel_freq_monthly",
+    "questionKey": "onboarding_frequency",
+    "order": 1,
+    "isCustom": false
+  },
+  {
+    "key": "sel_freq_weekly",
+    "questionKey": "onboarding_frequency",
+    "order": 2,
+    "isCustom": false
+  },
+  { "key": "sel_freq_daily", "questionKey": "onboarding_frequency", "order": 3, "isCustom": false },
+
+  {
+    "key": "sel_intensity_mild",
+    "questionKey": "migraine_intensity",
+    "order": 1,
+    "isCustom": false
+  },
+  {
+    "key": "sel_intensity_moderate",
+    "questionKey": "migraine_intensity",
+    "order": 2,
+    "isCustom": false
+  },
+  {
+    "key": "sel_intensity_severe",
+    "questionKey": "migraine_intensity",
+    "order": 3,
+    "isCustom": false
+  },
+
+  {
+    "key": "sel_symptom_nausea",
+    "questionKey": "migraine_symptoms",
+    "order": 1,
+    "isCustom": false
+  },
+  {
+    "key": "sel_symptom_photophobia",
+    "questionKey": "migraine_symptoms",
+    "order": 2,
+    "isCustom": false
+  },
+  {
+    "key": "sel_symptom_phonophobia",
+    "questionKey": "migraine_symptoms",
+    "order": 3,
+    "isCustom": false
+  },
+
+  {
+    "key": "sel_trigger_stress",
+    "questionKey": "migraine_triggers",
+    "order": 1,
+    "isCustom": false
+  },
+  {
+    "key": "sel_trigger_lack_of_sleep",
+    "questionKey": "migraine_triggers",
+    "order": 2,
+    "isCustom": false
+  },
+  {
+    "key": "sel_trigger_alcohol",
+    "questionKey": "migraine_triggers",
+    "order": 3,
+    "isCustom": false
+  }
+]

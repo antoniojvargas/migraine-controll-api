@@ -1,0 +1,65 @@
+[
+  { "selectionKey": "sel_aura_visual", "languageCode": "en", "text": "Visual aura" },
+  { "selectionKey": "sel_aura_visual", "languageCode": "fr", "text": "Aura visuelle" },
+  { "selectionKey": "sel_aura_visual", "languageCode": "es", "text": "Aura visual" },
+
+  { "selectionKey": "sel_aura_sensory", "languageCode": "en", "text": "Sensory aura" },
+  { "selectionKey": "sel_aura_sensory", "languageCode": "fr", "text": "Aura sensorielle" },
+  { "selectionKey": "sel_aura_sensory", "languageCode": "es", "text": "Aura sensorial" },
+
+  { "selectionKey": "sel_aura_none", "languageCode": "en", "text": "No aura" },
+  { "selectionKey": "sel_aura_none", "languageCode": "fr", "text": "Pas d'aura" },
+  { "selectionKey": "sel_aura_none", "languageCode": "es", "text": "Sin aura" },
+
+  { "selectionKey": "sel_freq_monthly", "languageCode": "en", "text": "Monthly" },
+  { "selectionKey": "sel_freq_monthly", "languageCode": "fr", "text": "Mensuel" },
+  { "selectionKey": "sel_freq_monthly", "languageCode": "es", "text": "Mensual" },
+
+  { "selectionKey": "sel_freq_weekly", "languageCode": "en", "text": "Weekly" },
+  { "selectionKey": "sel_freq_weekly", "languageCode": "fr", "text": "Hebdomadaire" },
+  { "selectionKey": "sel_freq_weekly", "languageCode": "es", "text": "Semanal" },
+
+  { "selectionKey": "sel_freq_daily", "languageCode": "en", "text": "Daily" },
+  { "selectionKey": "sel_freq_daily", "languageCode": "fr", "text": "Quotidien" },
+  { "selectionKey": "sel_freq_daily", "languageCode": "es", "text": "Diario" },
+
+  { "selectionKey": "sel_intensity_mild", "languageCode": "en", "text": "Mild" },
+  { "selectionKey": "sel_intensity_mild", "languageCode": "fr", "text": "Légère" },
+  { "selectionKey": "sel_intensity_mild", "languageCode": "es", "text": "Leve" },
+
+  { "selectionKey": "sel_intensity_moderate", "languageCode": "en", "text": "Moderate" },
+  { "selectionKey": "sel_intensity_moderate", "languageCode": "fr", "text": "Modérée" },
+  { "selectionKey": "sel_intensity_moderate", "languageCode": "es", "text": "Moderada" },
+
+  { "selectionKey": "sel_intensity_severe", "languageCode": "en", "text": "Severe" },
+  { "selectionKey": "sel_intensity_severe", "languageCode": "fr", "text": "Sévère" },
+  { "selectionKey": "sel_intensity_severe", "languageCode": "es", "text": "Severa" },
+
+  { "selectionKey": "sel_symptom_nausea", "languageCode": "en", "text": "Nausea" },
+  { "selectionKey": "sel_symptom_nausea", "languageCode": "fr", "text": "Nausée" },
+  { "selectionKey": "sel_symptom_nausea", "languageCode": "es", "text": "Náuseas" },
+
+  { "selectionKey": "sel_symptom_photophobia", "languageCode": "en", "text": "Photophobia" },
+  { "selectionKey": "sel_symptom_photophobia", "languageCode": "fr", "text": "Photophobie" },
+  { "selectionKey": "sel_symptom_photophobia", "languageCode": "es", "text": "Fotofobia" },
+
+  { "selectionKey": "sel_symptom_phonophobia", "languageCode": "en", "text": "Phonophobia" },
+  { "selectionKey": "sel_symptom_phonophobia", "languageCode": "fr", "text": "Phonophobie" },
+  { "selectionKey": "sel_symptom_phonophobia", "languageCode": "es", "text": "Fonofobia" },
+
+  { "selectionKey": "sel_trigger_stress", "languageCode": "en", "text": "Stress" },
+  { "selectionKey": "sel_trigger_stress", "languageCode": "fr", "text": "Stress" },
+  { "selectionKey": "sel_trigger_stress", "languageCode": "es", "text": "Estrés" },
+
+  { "selectionKey": "sel_trigger_lack_of_sleep", "languageCode": "en", "text": "Lack of sleep" },
+  {
+    "selectionKey": "sel_trigger_lack_of_sleep",
+    "languageCode": "fr",
+    "text": "Manque de sommeil"
+  },
+  { "selectionKey": "sel_trigger_lack_of_sleep", "languageCode": "es", "text": "Falta de sueño" },
+
+  { "selectionKey": "sel_trigger_alcohol", "languageCode": "en", "text": "Alcohol" },
+  { "selectionKey": "sel_trigger_alcohol", "languageCode": "fr", "text": "Alcool" },
+  { "selectionKey": "sel_trigger_alcohol", "languageCode": "es", "text": "Alcohol" }
+]
