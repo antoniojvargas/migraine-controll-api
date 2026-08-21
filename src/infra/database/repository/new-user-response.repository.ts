@@ -13,6 +13,12 @@ export class NewUserResponseRepository implements RepositoryInterface<NewUserRes
     return this.repository.save(this.repository.create(data));
   }
 
+  async delete(
+    criteria: FindOptionsWhere<NewUserResponseEntity> | FindOptionsWhere<NewUserResponseEntity>[],
+  ): Promise<void> {
+    await this.repository.delete(criteria);
+  }
+
   findOneBy(
     criteria: FindOptionsWhere<NewUserResponseEntity> | FindOptionsWhere<NewUserResponseEntity>[],
   ): Promise<NewUserResponseEntity | null> {
