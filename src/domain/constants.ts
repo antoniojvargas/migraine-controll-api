@@ -4,6 +4,10 @@ export const SUPPORTED_LANGUAGES = ['es', 'en', 'fr'] as const;
 
 export const ONBOARDING_LANGUAGES = ['en', 'fr'] as const;
 
+export const FORMS_CATEGORY_PREFIX = 'forms@';
+
+export const MIGRAINE_LOG_CATEGORY_PREFIX = 'migraine_log@';
+
 export const MAX_TRANSLATION_TEXT_LENGTH = 200;
 
 export const MAX_ANSWER_TEXT_LENGTH = 1000;
