@@ -13,7 +13,7 @@ describe('Translation domain', () => {
     expect(translation.selectionId).toBe('sel-1');
   });
 
-  it.each(['', 'de', 'fr', 'en-US', 'es_ES'])('rejects unsupported language %p', (languageCode) => {
+  it.each(['', 'de', 'en-US', 'es_ES'])('rejects unsupported language %p', (languageCode) => {
     expect(() => Translation.createNewTranslation({ ...validDto(), languageCode })).toThrow(
       DomainError,
     );

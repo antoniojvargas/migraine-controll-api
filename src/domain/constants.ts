@@ -1,6 +1,8 @@
 export const QUESTION_TYPES = ['single', 'multiple', 'scale', 'text'] as const;
 
-export const SUPPORTED_LANGUAGES = ['es', 'en'] as const;
+export const SUPPORTED_LANGUAGES = ['es', 'en', 'fr'] as const;
+
+export const ONBOARDING_LANGUAGES = ['en', 'fr'] as const;
 
 export const MAX_TRANSLATION_TEXT_LENGTH = 200;
 
