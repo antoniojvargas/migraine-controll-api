@@ -37,6 +37,38 @@ describe('cross-cutting middlewares', () => {
       expect(response.headers['access-control-allow-methods']).toContain('GET');
       expect(Number(response.headers['access-control-max-age'])).toBeGreaterThan(0);
     });
+
+    it('reflects allowed origins from an allowlist and adds Vary: Origin', async () => {
+      const app = buildApp({
+        cors: { origin: ['https://app.example.com'], credentials: true },
+      });
+      const allowed = await app.inject({
+        method: 'GET',
+        url: '/health',
+        headers: { origin: 'https://app.example.com' },
+      });
+      expect(allowed.headers['access-control-allow-origin']).toBe('https://app.example.com');
+      expect(allowed.headers['access-control-allow-credentials']).toBe('true');
+      expect(allowed.headers.vary).toBe('Origin');
+
+      const denied = await app.inject({
+        method: 'GET',
+        url: '/health',
+        headers: { origin: 'https://evil.example.com' },
+      });
+      expect(denied.headers['access-control-allow-origin']).toBeUndefined();
+      expect(denied.headers['access-control-allow-credentials']).toBeUndefined();
+    });
+
+    it('keeps a fixed origin static without Vary', async () => {
+      const response = await buildApp({ cors: { origin: 'https://app.example.com' } }).inject({
+        method: 'GET',
+        url: '/health',
+        headers: { origin: 'https://other.example.com' },
+      });
+      expect(response.headers['access-control-allow-origin']).toBe('https://app.example.com');
+      expect(response.headers.vary).toBeUndefined();
+    });
   });
 
   describe('rate limiting', () => {
