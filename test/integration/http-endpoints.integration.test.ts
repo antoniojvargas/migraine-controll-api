@@ -4,6 +4,7 @@ import { dataSource } from '@/infra/database/dataSource';
 import { UserEntity } from '@/infra/database/entities';
 import { buildApp } from '@/factory/build-app';
 import { CognitoUserDirectoryPort } from '@/usecase/ports/cognito-user-directory.port';
+import { CognitoJwtVerifierPort } from '@/adapter/http/plugins/auth';
 import { initTestDb } from './helpers';
 
 describe('HTTP endpoints (real Postgres via Docker)', () => {
@@ -14,10 +15,18 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
     tombstoneUser: jest.fn(),
     deleteUser: jest.fn(),
   };
+  const cognitoJwtVerifier: CognitoJwtVerifierPort = {
+    verify: jest.fn(async (token: string) => {
+      if (token === 'invalid-token') {
+        throw new Error('invalid token');
+      }
+      return { sub: token };
+    }),
+  };
 
   beforeAll(async () => {
     await initTestDb();
-    app = buildApp({ dataSource, cognitoUserDirectory });
+    app = buildApp({ dataSource, cognitoUserDirectory, cognitoJwtVerifier });
     await app.ready();
   });
 
@@ -160,10 +169,12 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
   });
 
   describe('DELETE /users/me', () => {
-    it('deletes the authenticated user identified by the x-user-id header', async () => {
+    it('deletes the authenticated user resolved from the Cognito JWT', async () => {
       const user = await createUser('delete-me-a@test.com');
 
-      const response = await request(app.server).delete('/users/me').set('x-user-id', user.id);
+      const response = await request(app.server)
+        .delete('/users/me')
+        .set('Authorization', `Bearer ${user.externalId}`);
 
       expect(response.status).toBe(204);
 
@@ -171,8 +182,16 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
       expect(stillFound).toBeNull();
     });
 
-    it('returns 401 when the x-user-id header is missing', async () => {
+    it('returns 401 when the Authorization header is missing', async () => {
       const response = await request(app.server).delete('/users/me');
+
+      expect(response.status).toBe(401);
+    });
+
+    it('returns 401 when the JWT fails verification', async () => {
+      const response = await request(app.server)
+        .delete('/users/me')
+        .set('Authorization', 'Bearer invalid-token');
 
       expect(response.status).toBe(401);
     });

@@ -33,7 +33,9 @@ import {
   UserEntity,
 } from '@/infra/database/entities';
 import { CognitoUserDirectoryAdapter } from '@/infra/aws/cognito-user-directory.adapter';
+import { CognitoJwtVerifierAdapter } from '@/infra/aws/cognito-jwt-verifier.adapter';
 import { CognitoUserDirectoryPort } from '@/usecase/ports/cognito-user-directory.port';
+import { CognitoJwtVerifierPort, registerAuth } from '@/adapter/http/plugins/auth';
 import { FindAppVersionUc } from '@/usecase/find-app-version.uc';
 import { UpsertPreferredAnswerUc } from '@/usecase/upsert-preferred-answer.uc';
 import { FindPreferredAnswersByUserUc } from '@/usecase/find-preferred-answers-by-user.uc';
@@ -76,6 +78,7 @@ export interface BuildAppOptions {
   rateLimit?: RateLimitOptions;
   docs?: DocsOptions;
   cognitoUserDirectory?: CognitoUserDirectoryPort;
+  cognitoJwtVerifier?: CognitoJwtVerifierPort;
 }
 
 export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
@@ -129,6 +132,13 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
         envs.COGNITO_USER_POOL_ID,
         envs.COGNITO_LEGACY_USER_POOL_ID === '' ? undefined : envs.COGNITO_LEGACY_USER_POOL_ID,
       );
+    const cognitoJwtVerifier =
+      options.cognitoJwtVerifier ??
+      new CognitoJwtVerifierAdapter(
+        envs.COGNITO_USER_POOL_ID,
+        envs.COGNITO_LEGACY_USER_POOL_ID === '' ? undefined : envs.COGNITO_LEGACY_USER_POOL_ID,
+      );
+    registerAuth(app, cognitoJwtVerifier, userRepository);
 
     registerAppVersionRoutes(
       app,
@@ -180,10 +190,7 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
     );
     registerUserRoutes(
       app,
-      new UserController(
-        new CognitoDeleteUserUc(userRepository, cognitoUserDirectory),
-        userRepository,
-      ),
+      new UserController(new CognitoDeleteUserUc(userRepository, cognitoUserDirectory)),
     );
   }
 
