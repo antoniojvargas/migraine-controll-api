@@ -45,7 +45,10 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
   registerErrorHandler(app);
   registerRequestContext(app);
   registerCors(app, options.cors);
-  registerRateLimit(app, options.rateLimit);
+  registerRateLimit(app, {
+    ...options.rateLimit,
+    skip: options.rateLimit?.skip ?? ((request) => request.url.split('?')[0] === '/health'),
+  });
 
   const dataSource = options.dataSource;
   if (dataSource !== undefined) {

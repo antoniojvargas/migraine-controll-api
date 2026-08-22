@@ -4,6 +4,7 @@ export interface RateLimitOptions {
   windowMs?: number;
   max?: number;
   keyGenerator?: (request: FastifyRequest) => string;
+  skip?: (request: FastifyRequest) => boolean;
 }
 
 interface Bucket {
@@ -25,6 +26,7 @@ export const registerRateLimit = (app: FastifyInstance, options: RateLimitOption
   const windowMs = options.windowMs ?? 60_000;
   const max = options.max ?? 100;
   const keyGenerator = options.keyGenerator ?? ((request: FastifyRequest) => request.ip);
+  const skip = options.skip ?? (() => false);
   const buckets = new Map<string, Bucket>();
 
   app.addHook('onRequest', async (request, reply) => {
@@ -32,13 +34,21 @@ export const registerRateLimit = (app: FastifyInstance, options: RateLimitOption
     if (buckets.size >= MAX_BUCKETS) {
       prune(buckets, now);
     }
-    const key = keyGenerator(request);
-    const bucket = buckets.get(key);
-    if (bucket === undefined || bucket.resetAt <= now) {
-      buckets.set(key, { count: 1, resetAt: now + windowMs });
+    if (skip(request)) {
       return;
     }
+    const key = keyGenerator(request);
+    let bucket = buckets.get(key);
+    if (bucket === undefined || bucket.resetAt <= now) {
+      bucket = { count: 0, resetAt: now + windowMs };
+      buckets.set(key, bucket);
+    }
     bucket.count += 1;
+
+    reply.header('X-RateLimit-Limit', max);
+    reply.header('X-RateLimit-Remaining', Math.max(0, max - bucket.count));
+    reply.header('X-RateLimit-Reset', Math.ceil(bucket.resetAt / 1000));
+
     if (bucket.count > max) {
       await reply
         .status(429)

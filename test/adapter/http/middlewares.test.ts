@@ -74,15 +74,52 @@ describe('cross-cutting middlewares', () => {
   describe('rate limiting', () => {
     it('returns 429 with Retry-After once the window budget is exhausted', async () => {
       const app = buildApp({ rateLimit: { max: 2, windowMs: 60_000 } });
-      const first = await app.inject({ method: 'GET', url: '/health' });
-      const second = await app.inject({ method: 'GET', url: '/health' });
-      const third = await app.inject({ method: 'GET', url: '/health' });
+      app.get('/ping', async () => ({ status: 'pong' }));
+      const first = await app.inject({ method: 'GET', url: '/ping' });
+      const second = await app.inject({ method: 'GET', url: '/ping' });
+      const third = await app.inject({ method: 'GET', url: '/ping' });
 
       expect(first.statusCode).toBe(200);
       expect(second.statusCode).toBe(200);
       expect(third.statusCode).toBe(429);
       expect(third.json()).toMatchObject({ code: 'RATE_LIMITED' });
       expect(Number(third.headers['retry-after'])).toBeGreaterThanOrEqual(1);
+    });
+
+    it('exposes standard X-RateLimit headers that decrease per request', async () => {
+      const app = buildApp({ rateLimit: { max: 5, windowMs: 60_000 } });
+      app.get('/ping', async () => ({ status: 'pong' }));
+      const first = await app.inject({ method: 'GET', url: '/ping' });
+      const second = await app.inject({ method: 'GET', url: '/ping' });
+
+      expect(first.headers['x-ratelimit-limit']).toBe('5');
+      expect(first.headers['x-ratelimit-remaining']).toBe('4');
+      expect(Number(first.headers['x-ratelimit-reset'])).toBeGreaterThan(
+        Math.floor(Date.now() / 1000),
+      );
+      expect(second.headers['x-ratelimit-remaining']).toBe('3');
+    });
+
+    it('does not count skipped requests against the budget', async () => {
+      const app = buildApp({
+        rateLimit: { max: 1, windowMs: 60_000, skip: () => true },
+      });
+      for (let i = 0; i < 3; i += 1) {
+        const response = await app.inject({ method: 'GET', url: '/health' });
+        expect(response.statusCode).toBe(200);
+      }
+    });
+
+    it('keeps /health exempt from the default limit in buildApp', async () => {
+      const app = buildApp({ rateLimit: { max: 1, windowMs: 60_000 } });
+      for (let i = 0; i < 5; i += 1) {
+        const response = await app.inject({ method: 'GET', url: '/health' });
+        expect(response.statusCode).toBe(200);
+      }
+      const other = await app.inject({ method: 'GET', url: '/anything-else' });
+      const exhausted = await app.inject({ method: 'GET', url: '/anything-else' });
+      expect(other.statusCode).toBe(404);
+      expect(exhausted.statusCode).toBe(429);
     });
   });
 
