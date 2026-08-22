@@ -9,13 +9,33 @@ import { registerDocs, DocsOptions } from '@/adapter/http/plugins/docs';
 import { AppVersionRepository } from '@/infra/database/repository/app-version.repository';
 import { PreferredAnswersRepository } from '@/infra/database/repository/preferred-answers.repository';
 import { AcuteTreatmentWorseFeedbackOptionsRepository } from '@/infra/database/repository/acute-treatment-worse-feedback-options.repository';
+import { ProfileRepository } from '@/infra/database/repository/profile.repository';
+import { MigraineLogRepository } from '@/infra/database/repository/migraine-log.repository';
+import { PreventiveTreatmentRepository } from '@/infra/database/repository/preventive-treatment.repository';
+import { UserResponseRepository } from '@/infra/database/repository/user-response.repository';
+import { QuestionRepository } from '@/infra/database/repository/question.repository';
+import { SelectionRepository } from '@/infra/database/repository/selection.repository';
+import { TranslationRepository } from '@/infra/database/repository/translation.repository';
 import { AppVersionEntity } from '@/infra/database/entities/app-version.entity';
 import { PreferredAnswersEntity } from '@/infra/database/entities/preferred-answers.entity';
 import { AcuteTreatmentWorseFeedbackOptionsEntity } from '@/infra/database/entities/acute-treatment-worse-feedback-options.entity';
+import {
+  ProfileEntity,
+  MigraineLogEntity,
+  PreventiveTreatmentEntity,
+  UserResponseEntity,
+  QuestionEntity,
+  SelectionEntity,
+  TranslationEntity,
+} from '@/infra/database/entities';
 import { FindAppVersionUc } from '@/usecase/find-app-version.uc';
 import { UpsertPreferredAnswerUc } from '@/usecase/upsert-preferred-answer.uc';
 import { FindPreferredAnswersByUserUc } from '@/usecase/find-preferred-answers-by-user.uc';
 import { FindAcuteTreatmentWorseFeedbackOptionsUc } from '@/usecase/find-acute-treatment-worse-feedback-options.uc';
+import { CreateProfileUc } from '@/usecase/create-profile.uc';
+import { CreateMigraineLogUc } from '@/usecase/create-migraine-log.uc';
+import { CreatePreventiveTreatmentUc } from '@/usecase/create-preventive-treatment.uc';
+import { FindCalendarViewUc } from '@/usecase/find-calendar-view.uc';
 import {
   AppVersionController,
   registerAppVersionRoutes,
@@ -28,6 +48,19 @@ import {
   AcuteTreatmentFeedbackController,
   registerAcuteTreatmentFeedbackRoutes,
 } from '@/adapter/http/acute-treatment-feedback.controller';
+import { ProfileController, registerProfileRoutes } from '@/adapter/http/profile.controller';
+import {
+  MigraineLogController,
+  registerMigraineLogRoutes,
+} from '@/adapter/http/migraine-log.controller';
+import {
+  PreventiveTreatmentController,
+  registerPreventiveTreatmentRoutes,
+} from '@/adapter/http/preventive-treatment.controller';
+import {
+  CalendarViewController,
+  registerCalendarViewRoutes,
+} from '@/adapter/http/calendar-view.controller';
 
 export interface BuildAppOptions {
   dataSource?: DataSource;
@@ -64,6 +97,21 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
     const feedbackOptionsRepository = new AcuteTreatmentWorseFeedbackOptionsRepository(
       dataSource.getRepository(AcuteTreatmentWorseFeedbackOptionsEntity),
     );
+    const profileRepository = new ProfileRepository(dataSource.getRepository(ProfileEntity));
+    const migraineLogRepository = new MigraineLogRepository(
+      dataSource.getRepository(MigraineLogEntity),
+    );
+    const preventiveTreatmentRepository = new PreventiveTreatmentRepository(
+      dataSource.getRepository(PreventiveTreatmentEntity),
+    );
+    const userResponseRepository = new UserResponseRepository(
+      dataSource.getRepository(UserResponseEntity),
+    );
+    const questionRepository = new QuestionRepository(dataSource.getRepository(QuestionEntity));
+    const selectionRepository = new SelectionRepository(dataSource.getRepository(SelectionEntity));
+    const translationRepository = new TranslationRepository(
+      dataSource.getRepository(TranslationEntity),
+    );
 
     registerAppVersionRoutes(
       app,
@@ -81,6 +129,37 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
       new AcuteTreatmentFeedbackController(
         new FindAcuteTreatmentWorseFeedbackOptionsUc(feedbackOptionsRepository),
       ),
+    );
+    registerProfileRoutes(app, new ProfileController(new CreateProfileUc(profileRepository)));
+    registerMigraineLogRoutes(
+      app,
+      new MigraineLogController(
+        new CreateMigraineLogUc(
+          migraineLogRepository,
+          preferredAnswersRepository,
+          userResponseRepository,
+          questionRepository,
+          selectionRepository,
+          translationRepository,
+        ),
+      ),
+    );
+    registerPreventiveTreatmentRoutes(
+      app,
+      new PreventiveTreatmentController(
+        new CreatePreventiveTreatmentUc(
+          preventiveTreatmentRepository,
+          preferredAnswersRepository,
+          userResponseRepository,
+          questionRepository,
+          selectionRepository,
+          translationRepository,
+        ),
+      ),
+    );
+    registerCalendarViewRoutes(
+      app,
+      new CalendarViewController(new FindCalendarViewUc(migraineLogRepository)),
     );
   }
 
