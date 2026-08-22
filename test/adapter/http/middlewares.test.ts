@@ -3,9 +3,28 @@ import { AppError } from '@/utils/app-error';
 import { DomainError } from '@/domain/domain-error';
 import { buildApp } from '@/factory/build-app';
 import { registerErrorHandler, toErrorPayload } from '@/adapter/http/error-handler';
+import { getRequestLogContext, requestLogMixin } from '@/config/request-log-context';
 
 describe('cross-cutting middlewares', () => {
   describe('request-id / correlation-id + CORS on the real app', () => {
+    it('propagates the request id into the async log context', async () => {
+      const app = buildApp();
+      app.get('/whoami', async () => ({ context: getRequestLogContext() }));
+      const response = await app.inject({
+        method: 'GET',
+        url: '/whoami',
+        headers: { 'x-request-id': 'trace-42' },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        context: { requestId: 'trace-42', correlationId: 'trace-42' },
+      });
+    });
+
+    it('leaves the log context empty outside of requests', () => {
+      expect(getRequestLogContext()).toBeUndefined();
+      expect(requestLogMixin()).toEqual({});
+    });
     it('generates and echoes request id headers', async () => {
       const response = await buildApp().inject({ method: 'GET', url: '/health' });
       expect(response.statusCode).toBe(200);

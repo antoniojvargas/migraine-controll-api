@@ -1,5 +1,6 @@
 import pino from 'pino';
 import { envs } from '@/config/env';
+import { requestLogMixin } from '@/config/request-log-context';
 
 const levelByEnv: Record<string, string> = {
   production: 'info',
@@ -9,6 +10,7 @@ const levelByEnv: Record<string, string> = {
 
 export const logger = pino({
   level: levelByEnv[envs.NODE_ENV] ?? 'info',
+  mixin: requestLogMixin,
   serializers: {
     err: pino.stdSerializers.err,
   },
