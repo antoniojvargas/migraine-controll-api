@@ -5,6 +5,7 @@ import { registerErrorHandler } from '@/adapter/http/error-handler';
 import { createGenReqId, registerRequestContext } from '@/adapter/http/plugins/request-context';
 import { registerCors, CorsOptions } from '@/adapter/http/plugins/cors';
 import { registerRateLimit, RateLimitOptions } from '@/adapter/http/plugins/rate-limit';
+import { registerDocs, DocsOptions } from '@/adapter/http/plugins/docs';
 import { AppVersionRepository } from '@/infra/database/repository/app-version.repository';
 import { PreferredAnswersRepository } from '@/infra/database/repository/preferred-answers.repository';
 import { AcuteTreatmentWorseFeedbackOptionsRepository } from '@/infra/database/repository/acute-treatment-worse-feedback-options.repository';
@@ -32,6 +33,7 @@ export interface BuildAppOptions {
   dataSource?: DataSource;
   cors?: CorsOptions;
   rateLimit?: RateLimitOptions;
+  docs?: DocsOptions;
 }
 
 export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
@@ -49,6 +51,7 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
     ...options.rateLimit,
     skip: options.rateLimit?.skip ?? ((request) => request.url.split('?')[0] === '/health'),
   });
+  registerDocs(app, options.docs);
 
   const dataSource = options.dataSource;
   if (dataSource !== undefined) {

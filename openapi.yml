@@ -1,0 +1,241 @@
+openapi: 3.0.3
+info:
+  title: Migraine Control API
+  version: 1.0.0
+  description: >
+    API del backend de Migraine Control. Documentación mantenida a mano;
+    la UI interactiva se expone en /docs solo fuera de producción.
+servers:
+  - url: http://localhost:3000
+tags:
+  - name: Health
+    description: Disponibilidad del servicio
+  - name: AppVersion
+    description: Chequeo de versión mínima y force-update por plataforma
+  - name: PreferredAnswers
+    description: Respuestas preferidas por pregunta del cuestionario
+  - name: AcuteTreatmentFeedback
+    description: Opciones de feedback cuando un tratamiento agudo empeora al paciente
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: getHealth
+      responses:
+        '200':
+          description: Servicio operativo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /app-version:
+    get:
+      tags: [AppVersion]
+      summary: Comprueba si el cliente requiere actualización
+      operationId: checkAppVersion
+      parameters:
+        - name: platform
+          in: query
+          required: true
+          description: Plataforma registrada (ej. ios, android)
+          schema:
+            type: string
+        - name: currentVersion
+          in: query
+          required: true
+          description: Versión instalada del cliente en formato semver
+          schema:
+            type: string
+            pattern: '^\d+\.\d+\.\d+$'
+            example: 1.2.0
+      responses:
+        '200':
+          description: Resultado del chequeo de versión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppVersionCheckOutput'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /users/{userId}/preferred-answers:
+    get:
+      tags: [PreferredAnswers]
+      summary: Lista las respuestas preferidas de un usuario
+      operationId: listPreferredAnswers
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Respuestas preferidas del usuario (posiblemente vacía)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PreferredAnswerOutput'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /users/{userId}/preferred-answers/{questionId}:
+    put:
+      tags: [PreferredAnswers]
+      summary: Crea o actualiza la respuesta preferida de una pregunta (upsert)
+      operationId: upsertPreferredAnswer
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                selectionId:
+                  type: string
+                  format: uuid
+                  description: Selección elegida; su presencia descarta answerText previo
+                answerText:
+                  type: string
+                  description: Texto libre; obligatorio cuando no se envía selectionId
+      responses:
+        '200':
+          description: Registro creado o actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreferredAnswerOutput'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /acute-treatment-worse-feedback-options:
+    get:
+      tags: [AcuteTreatmentFeedback]
+      summary: Lista las opciones de feedback disponibles
+      operationId: listAcuteTreatmentWorseFeedbackOptions
+      responses:
+        '200':
+          description: Catálogo completo de opciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AcuteTreatmentWorseFeedbackOptionOutput'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+components:
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      description: Identificador del usuario
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    AppVersionCheckOutput:
+      type: object
+      required: [platform, latestVersion, forceUpdate, announcement, updateRequired]
+      properties:
+        platform:
+          type: string
+          example: ios
+        latestVersion:
+          type: string
+          example: 1.2.0
+        forceUpdate:
+          type: boolean
+        announcement:
+          type: boolean
+        updateRequired:
+          type: boolean
+          description: true solo si forceUpdate está activo y la versión cliente es menor
+    PreferredAnswerOutput:
+      type: object
+      required: [id, userId, questionId, selectionId, answerText]
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        questionId:
+          type: string
+          format: uuid
+        selectionId:
+          type: string
+          format: uuid
+          nullable: true
+        answerText:
+          type: string
+          nullable: true
+    AcuteTreatmentWorseFeedbackOptionOutput:
+      type: object
+      required: [id, key, text]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+          example: no_change
+        text:
+          type: string
+          example: Sin cambios
+    Error:
+      type: object
+      required: [statusCode, code, message]
+      properties:
+        statusCode:
+          type: integer
+          example: 400
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+  responses:
+    BadRequest:
+      description: Petición inválida (validación o regla de dominio)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            validation:
+              value:
+                statusCode: 400
+                code: VALIDATION_ERROR
+                message: platform is required
+    RateLimited:
+      description: Límite de peticiones excedido
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Segundos hasta poder reintentar
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 429
+            code: RATE_LIMITED
+            message: Too many requests

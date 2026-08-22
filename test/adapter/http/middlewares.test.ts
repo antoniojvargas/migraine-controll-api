@@ -142,6 +142,39 @@ describe('cross-cutting middlewares', () => {
     });
   });
 
+  describe('docs', () => {
+    it('serves the Swagger UI HTML page in non production environments', async () => {
+      const response = await buildApp().inject({ method: 'GET', url: '/docs' });
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['content-type']).toContain('text/html');
+      expect(response.body).toContain('SwaggerUIBundle');
+      expect(response.body).toContain('/docs/openapi.yml');
+    });
+
+    it('serves the raw OpenAPI spec with all documented paths', async () => {
+      const response = await buildApp().inject({ method: 'GET', url: '/docs/openapi.yml' });
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['content-type']).toContain('application/yaml');
+      for (const path of [
+        '/health:',
+        '/app-version:',
+        '/users/{userId}/preferred-answers:',
+        '/users/{userId}/preferred-answers/{questionId}:',
+        '/acute-treatment-worse-feedback-options:',
+      ]) {
+        expect(response.body).toContain(path);
+      }
+    });
+
+    it('does not expose docs when explicitly disabled (production)', async () => {
+      const app = buildApp({ docs: { enabled: false } });
+      const html = await app.inject({ method: 'GET', url: '/docs' });
+      const spec = await app.inject({ method: 'GET', url: '/docs/openapi.yml' });
+      expect(html.statusCode).toBe(404);
+      expect(spec.statusCode).toBe(404);
+    });
+  });
+
   describe('global error handler', () => {
     const buildFailingApp = (handler: () => never): FastifyInstance => {
       const app = Fastify({ logger: false }) as unknown as FastifyInstance;
