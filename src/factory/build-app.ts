@@ -34,13 +34,17 @@ import {
 } from '@/infra/database/entities';
 import { CognitoUserDirectoryAdapter } from '@/infra/aws/cognito-user-directory.adapter';
 import { CognitoJwtVerifierAdapter } from '@/infra/aws/cognito-jwt-verifier.adapter';
+import { CognitoIdentityProviderAdapter } from '@/infra/aws/cognito-identity-provider.adapter';
 import { CognitoUserDirectoryPort } from '@/usecase/ports/cognito-user-directory.port';
+import { CognitoIdentityProviderPort } from '@/usecase/ports/cognito-identity-provider.port';
 import { CognitoJwtVerifierPort, registerAuth } from '@/adapter/http/plugins/auth';
 import { FindAppVersionUc } from '@/usecase/find-app-version.uc';
 import { UpsertPreferredAnswerUc } from '@/usecase/upsert-preferred-answer.uc';
 import { FindPreferredAnswersByUserUc } from '@/usecase/find-preferred-answers-by-user.uc';
 import { FindAcuteTreatmentWorseFeedbackOptionsUc } from '@/usecase/find-acute-treatment-worse-feedback-options.uc';
 import { CreateProfileUc } from '@/usecase/create-profile.uc';
+import { UpdateProfileUc } from '@/usecase/update-profile.uc';
+import { CognitoUpdateUserAttributesUc } from '@/usecase/cognito-update-user-attributes.uc';
 import { CreateMigraineLogUc } from '@/usecase/create-migraine-log.uc';
 import { CreatePreventiveTreatmentUc } from '@/usecase/create-preventive-treatment.uc';
 import { FindCalendarViewUc } from '@/usecase/find-calendar-view.uc';
@@ -79,6 +83,7 @@ export interface BuildAppOptions {
   docs?: DocsOptions;
   cognitoUserDirectory?: CognitoUserDirectoryPort;
   cognitoJwtVerifier?: CognitoJwtVerifierPort;
+  cognitoIdentityProvider?: CognitoIdentityProviderPort;
 }
 
 export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
@@ -125,19 +130,25 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
       dataSource.getRepository(TranslationEntity),
     );
     const userRepository = new UserRepository(dataSource.getRepository(UserEntity));
+    const legacyUserPoolId =
+      envs.COGNITO_LEGACY_USER_POOL_ID === '' ? undefined : envs.COGNITO_LEGACY_USER_POOL_ID;
+    const cognitoClient = new CognitoIdentityProviderClient({ region: envs.AWS_REGION });
     const cognitoUserDirectory =
       options.cognitoUserDirectory ??
-      new CognitoUserDirectoryAdapter(
-        new CognitoIdentityProviderClient({ region: envs.AWS_REGION }),
-        envs.COGNITO_USER_POOL_ID,
-        envs.COGNITO_LEGACY_USER_POOL_ID === '' ? undefined : envs.COGNITO_LEGACY_USER_POOL_ID,
-      );
+      new CognitoUserDirectoryAdapter(cognitoClient, envs.COGNITO_USER_POOL_ID, legacyUserPoolId);
     const cognitoJwtVerifier =
       options.cognitoJwtVerifier ??
-      new CognitoJwtVerifierAdapter(
+      new CognitoJwtVerifierAdapter(envs.COGNITO_USER_POOL_ID, legacyUserPoolId);
+    const cognitoIdentityProvider =
+      options.cognitoIdentityProvider ??
+      new CognitoIdentityProviderAdapter(
+        cognitoClient,
         envs.COGNITO_USER_POOL_ID,
-        envs.COGNITO_LEGACY_USER_POOL_ID === '' ? undefined : envs.COGNITO_LEGACY_USER_POOL_ID,
+        legacyUserPoolId,
       );
+    const cognitoUpdateUserAttributesUc = new CognitoUpdateUserAttributesUc(
+      cognitoIdentityProvider,
+    );
     registerAuth(app, cognitoJwtVerifier, userRepository);
 
     registerAppVersionRoutes(
@@ -157,7 +168,13 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
         new FindAcuteTreatmentWorseFeedbackOptionsUc(feedbackOptionsRepository),
       ),
     );
-    registerProfileRoutes(app, new ProfileController(new CreateProfileUc(profileRepository)));
+    registerProfileRoutes(
+      app,
+      new ProfileController(
+        new CreateProfileUc(profileRepository),
+        new UpdateProfileUc(profileRepository, cognitoUpdateUserAttributesUc),
+      ),
+    );
     registerMigraineLogRoutes(
       app,
       new MigraineLogController(

@@ -4,6 +4,7 @@ import { dataSource } from '@/infra/database/dataSource';
 import { UserEntity } from '@/infra/database/entities';
 import { buildApp } from '@/factory/build-app';
 import { CognitoUserDirectoryPort } from '@/usecase/ports/cognito-user-directory.port';
+import { CognitoIdentityProviderPort } from '@/usecase/ports/cognito-identity-provider.port';
 import { CognitoJwtVerifierPort } from '@/adapter/http/plugins/auth';
 import { initTestDb } from './helpers';
 
@@ -14,6 +15,9 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
     findUserByEmail: jest.fn().mockResolvedValue(null),
     tombstoneUser: jest.fn(),
     deleteUser: jest.fn(),
+  };
+  const cognitoIdentityProvider: CognitoIdentityProviderPort = {
+    updateUserAttributes: jest.fn(),
   };
   const cognitoJwtVerifier: CognitoJwtVerifierPort = {
     verify: jest.fn(async (token: string) => {
@@ -26,7 +30,12 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
 
   beforeAll(async () => {
     await initTestDb();
-    app = buildApp({ dataSource, cognitoUserDirectory, cognitoJwtVerifier });
+    app = buildApp({
+      dataSource,
+      cognitoUserDirectory,
+      cognitoIdentityProvider,
+      cognitoJwtVerifier,
+    });
     await app.ready();
   });
 
@@ -73,6 +82,45 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
 
       expect(response.status).toBe(400);
       expect(response.body).toMatchObject({ code: 'DOMAIN_VALIDATION_ERROR' });
+    });
+  });
+
+  describe('PATCH /users/:userId/profiles', () => {
+    it('updates the profile and syncs changed attributes to Cognito', async () => {
+      const user = await createUser('profiles-c@test.com');
+      await request(app.server).post(`/users/${user.id}/profiles`).send({
+        name: 'Ana',
+        gender: 'f',
+        birthDate: '1990-05-10',
+        language: 'es',
+        geohash6: 'dzn6c6',
+      });
+
+      const response = await request(app.server)
+        .patch(`/users/${user.id}/profiles`)
+        .send({ name: 'Ana Maria', gender: 'nb' });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        userId: user.id,
+        name: 'Ana Maria',
+        gender: 'nb',
+      });
+      expect(cognitoIdentityProvider.updateUserAttributes).toHaveBeenCalledWith({
+        externalId: user.externalId,
+        attributes: { name: 'Ana Maria', gender: 'nb' },
+      });
+    });
+
+    it('returns 404 when the profile does not exist', async () => {
+      const user = await createUser('profiles-d@test.com');
+
+      const response = await request(app.server)
+        .patch(`/users/${user.id}/profiles`)
+        .send({ name: 'Ana Maria' });
+
+      expect(response.status).toBe(404);
+      expect(response.body).toMatchObject({ code: 'PROFILE_NOT_FOUND' });
     });
   });
 

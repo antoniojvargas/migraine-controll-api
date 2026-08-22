@@ -36,12 +36,16 @@ export abstract class ProfileBaseUc {
   }
 
   protected async findByUserId(userId: string): Promise<ProfileOutputDto | null> {
-    const entity = await this.profileRepository
+    const entity = await this.findEntityByUserId(userId);
+    return entity === null ? null : this.toEntityOutput(entity);
+  }
+
+  protected async findEntityByUserId(userId: string): Promise<ProfileEntity | null> {
+    return this.profileRepository
       .createQueryBuilder('profile')
       .leftJoinAndSelect('profile.user', 'user')
       .where('profile.user_id = :userId', { userId })
       .getOne();
-    return entity === null ? null : this.toEntityOutput(entity);
   }
 
   protected async findById(id: string): Promise<ProfileOutputDto | null> {
