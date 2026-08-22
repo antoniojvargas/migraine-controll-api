@@ -7,7 +7,12 @@ de autenticación de Migraine Control API junto con sus tres triggers Lambda.
 
 - **`AWS::Cognito::UserPool`**: login por email, password policy (mínimo 8
   caracteres, mayúscula, minúscula y número), recuperación de cuenta por
-  email verificado, MFA desactivado por defecto.
+  email verificado, MFA desactivado por defecto. Además de `email`, expone
+  los atributos opcionales `name`, `gender`, `birthdate`, `locale` y el
+  atributo custom `geohash6`, que el cliente puede enviar durante el sign-up
+  para que Post-Confirmation cree el `Profile` completo (si falta alguno,
+  solo se crea el `User` y el onboarding se completa luego vía
+  `POST /users/:userId/profiles`).
 - **`AWS::Cognito::UserPoolClient`**: cliente público (sin secret) con flujos
   `USER_PASSWORD_AUTH`, `USER_SRP_AUTH` y refresh token habilitados.
 - **3 `AWS::Lambda::Function`** (una por trigger) + un rol de ejecución
@@ -17,11 +22,11 @@ de autenticación de Migraine Control API junto con sus tres triggers Lambda.
 
 ## Triggers
 
-| Trigger             | Handler                                                 | Código                        | Responsabilidad                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| ------------------- | ------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pre-SignUp          | `src/infra/aws/cognito-triggers/pre-sign-up.ts`         | `pre-sign-up.handler`         | Bloquea dominios de email no permitidos. Ejecuta `CognitoSignUpUc` (`src/usecase/cognito-sign-up.uc.ts`), que rechaza el alta si el email ya está registrado en `users`, o si fue el `original_email` de otro usuario que lo cambió hace menos de 30 días (cooldown de reutilización). Auto-confirma y auto-verifica únicamente cuando el alta viene de `PreSignUp_AdminCreateUser` (alta administrativa); el self-signup normal sigue el flujo estándar de confirmación por email de Cognito. |
-| Post-Confirmation   | `src/infra/aws/cognito-triggers/post-confirmation.ts`   | `post-confirmation.handler`   | Se ejecuta tras `PostConfirmation_ConfirmSignUp`. Punto de extensión para provisionar el usuario en la base de datos de la API (hoy solo registra el evento).                                                                                                                                                                                                                                                                                                                                  |
-| Post-Authentication | `src/infra/aws/cognito-triggers/post-authentication.ts` | `post-authentication.handler` | Se ejecuta en cada login exitoso. Punto de extensión para auditoría/último acceso (hoy solo registra el evento).                                                                                                                                                                                                                                                                                                                                                                               |
+| Trigger             | Handler                                                 | Código                        | Responsabilidad                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------- | ------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pre-SignUp          | `src/infra/aws/cognito-triggers/pre-sign-up.ts`         | `pre-sign-up.handler`         | Bloquea dominios de email no permitidos. Ejecuta `CognitoSignUpUc` (`src/usecase/cognito-sign-up.uc.ts`), que rechaza el alta si el email ya está registrado en `users`, o si fue el `original_email` de otro usuario que lo cambió hace menos de 30 días (cooldown de reutilización). Auto-confirma y auto-verifica únicamente cuando el alta viene de `PreSignUp_AdminCreateUser` (alta administrativa); el self-signup normal sigue el flujo estándar de confirmación por email de Cognito.                                           |
+| Post-Confirmation   | `src/infra/aws/cognito-triggers/post-confirmation.ts`   | `post-confirmation.handler`   | Se ejecuta tras `PostConfirmation_ConfirmSignUp`. Ejecuta `CognitoPostSignUpUc` (`src/usecase/cognito-post-sign-up.uc.ts`): crea `User` (+ `Profile` si el evento trae `name`/`gender`/`birthdate`/`locale`/`custom:geohash6`) para altas nuevas; si ya existe un `User` legado con ese email pero sin `externalId` (migración), lo vincula al `sub` de Cognito; si el `User` ya está vinculado pero el email de Cognito cambió, actualiza `email`/`original_email`/`email_changed_at` (mismo mecanismo de cooldown que usa Pre-SignUp). |
+| Post-Authentication | `src/infra/aws/cognito-triggers/post-authentication.ts` | `post-authentication.handler` | Se ejecuta en cada login exitoso. Punto de extensión para auditoría/último acceso (hoy solo registra el evento).                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 Los tres handlers son funciones puras `(event) => Promise<event>` que reciben
 y devuelven el evento del trigger sin mutar su forma, tal como exige el
@@ -29,13 +34,14 @@ contrato de Cognito Lambda triggers. Al bloquear el sign-up, `pre-sign-up.ts`
 propaga el error lanzado por `CognitoSignUpUc`, tal como exige Cognito para
 abortar el alta.
 
-`PreSignUpFunction` es la única que necesita conectividad a la base de datos
-Postgres de la API (para las validaciones de duplicados/cooldown), por lo que
-recibe las variables `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
-y `JWT_SECRET` (requerido por la validación de entorno compartida, aunque no
-se usa en este trigger). Si la base de datos vive dentro de una VPC privada,
-añadir `VpcConfig` a `PreSignUpFunction` con las subnets/security groups
-correspondientes.
+`PreSignUpFunction` y `PostConfirmationFunction` son las que necesitan
+conectividad a la base de datos Postgres de la API (validaciones de
+duplicados/cooldown y creación de `User`/`Profile`, respectivamente), por lo
+que reciben las variables `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`,
+`DB_NAME` y `JWT_SECRET` (requerido por la validación de entorno compartida,
+aunque no se usa en estos triggers). Si la base de datos vive dentro de una
+VPC privada, añadir `VpcConfig` a ambas funciones con las subnets/security
+groups correspondientes.
 
 ## Despliegue
 
