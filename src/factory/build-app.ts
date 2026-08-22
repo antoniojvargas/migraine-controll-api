@@ -1,6 +1,10 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import { DataSource } from 'typeorm';
 import { logger } from '@/config/logger';
+import { registerErrorHandler } from '@/adapter/http/error-handler';
+import { createGenReqId, registerRequestContext } from '@/adapter/http/plugins/request-context';
+import { registerCors, CorsOptions } from '@/adapter/http/plugins/cors';
+import { registerRateLimit, RateLimitOptions } from '@/adapter/http/plugins/rate-limit';
 import { AppVersionRepository } from '@/infra/database/repository/app-version.repository';
 import { PreferredAnswersRepository } from '@/infra/database/repository/preferred-answers.repository';
 import { AcuteTreatmentWorseFeedbackOptionsRepository } from '@/infra/database/repository/acute-treatment-worse-feedback-options.repository';
@@ -26,12 +30,22 @@ import {
 
 export interface BuildAppOptions {
   dataSource?: DataSource;
+  cors?: CorsOptions;
+  rateLimit?: RateLimitOptions;
 }
 
 export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
-  const app = Fastify({ loggerInstance: logger }) as unknown as FastifyInstance;
+  const app = Fastify({
+    loggerInstance: logger,
+    genReqId: createGenReqId(),
+  }) as unknown as FastifyInstance;
 
   app.get('/health', async () => ({ status: 'ok' }));
+
+  registerErrorHandler(app);
+  registerRequestContext(app);
+  registerCors(app, options.cors);
+  registerRateLimit(app, options.rateLimit);
 
   const dataSource = options.dataSource;
   if (dataSource !== undefined) {

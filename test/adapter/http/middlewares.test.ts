@@ -1,0 +1,121 @@
+import Fastify, { FastifyInstance } from 'fastify';
+import { AppError } from '@/utils/app-error';
+import { DomainError } from '@/domain/domain-error';
+import { buildApp } from '@/factory/build-app';
+import { registerErrorHandler, toErrorPayload } from '@/adapter/http/error-handler';
+
+describe('cross-cutting middlewares', () => {
+  describe('request-id / correlation-id + CORS on the real app', () => {
+    it('generates and echoes request id headers', async () => {
+      const response = await buildApp().inject({ method: 'GET', url: '/health' });
+      expect(response.statusCode).toBe(200);
+      const requestId = response.headers['x-request-id'];
+      expect(typeof requestId).toBe('string');
+      expect((requestId as string).length).toBeGreaterThan(0);
+      expect(response.headers['x-correlation-id']).toBe(requestId);
+    });
+
+    it('honors an incoming x-request-id', async () => {
+      const response = await buildApp().inject({
+        method: 'GET',
+        url: '/health',
+        headers: { 'x-request-id': 'trace-123' },
+      });
+      expect(response.headers['x-request-id']).toBe('trace-123');
+      expect(response.headers['x-correlation-id']).toBe('trace-123');
+    });
+
+    it('sets CORS headers on regular responses', async () => {
+      const response = await buildApp().inject({ method: 'GET', url: '/health' });
+      expect(response.headers['access-control-allow-origin']).toBe('*');
+      expect(response.headers['access-control-allow-headers']).toContain('x-user-id');
+    });
+
+    it('answers OPTIONS preflight with 204 and CORS headers', async () => {
+      const response = await buildApp().inject({ method: 'OPTIONS', url: '/health' });
+      expect(response.statusCode).toBe(204);
+      expect(response.headers['access-control-allow-methods']).toContain('GET');
+      expect(Number(response.headers['access-control-max-age'])).toBeGreaterThan(0);
+    });
+  });
+
+  describe('rate limiting', () => {
+    it('returns 429 with Retry-After once the window budget is exhausted', async () => {
+      const app = buildApp({ rateLimit: { max: 2, windowMs: 60_000 } });
+      const first = await app.inject({ method: 'GET', url: '/health' });
+      const second = await app.inject({ method: 'GET', url: '/health' });
+      const third = await app.inject({ method: 'GET', url: '/health' });
+
+      expect(first.statusCode).toBe(200);
+      expect(second.statusCode).toBe(200);
+      expect(third.statusCode).toBe(429);
+      expect(third.json()).toMatchObject({ code: 'RATE_LIMITED' });
+      expect(Number(third.headers['retry-after'])).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('global error handler', () => {
+    const buildFailingApp = (handler: () => never): FastifyInstance => {
+      const app = Fastify({ logger: false }) as unknown as FastifyInstance;
+      registerErrorHandler(app);
+      app.get('/boom', async () => handler());
+      return app;
+    };
+
+    it('maps AppError to its own status, code and message', async () => {
+      const response = await buildFailingApp(() => {
+        throw new AppError(409, 'CONFLICT', 'Resource already exists');
+      }).inject({ method: 'GET', url: '/boom' });
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({
+        statusCode: 409,
+        code: 'CONFLICT',
+        message: 'Resource already exists',
+      });
+    });
+
+    it('maps DomainError to 400 DOMAIN_VALIDATION_ERROR', async () => {
+      const response = await buildFailingApp(() => {
+        throw new DomainError('bad input');
+      }).inject({ method: 'GET', url: '/boom' });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        statusCode: 400,
+        code: 'DOMAIN_VALIDATION_ERROR',
+        message: 'bad input',
+      });
+    });
+
+    it('hides internals for unknown errors with a generic 500', async () => {
+      const response = await buildFailingApp(() => {
+        throw new Error('secret db credentials leaked');
+      }).inject({ method: 'GET', url: '/boom' });
+      expect(response.statusCode).toBe(500);
+      expect(response.json()).toEqual({
+        statusCode: 500,
+        code: 'INTERNAL_ERROR',
+        message: 'Internal server error',
+      });
+    });
+
+    it('passes through client errors carrying their own statusCode (<500)', async () => {
+      const response = await buildFailingApp((() => {
+        const error = new Error('malformed json') as Error & { statusCode?: number };
+        error.statusCode = 400;
+        throw error;
+      }) as () => never).inject({ method: 'GET', url: '/boom' });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ statusCode: 400, message: 'malformed json' });
+    });
+  });
+
+  describe('toErrorPayload', () => {
+    it('keeps AppError data untouched', () => {
+      expect(toErrorPayload(new AppError(418, 'TEAPOT', 'short and stout'))).toEqual({
+        statusCode: 418,
+        code: 'TEAPOT',
+        message: 'short and stout',
+      });
+    });
+  });
+});
