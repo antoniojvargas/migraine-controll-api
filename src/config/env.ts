@@ -19,4 +19,7 @@ export const envs = cleanEnv(process.env, {
   AWS_SECRET_ACCESS_KEY: str({ default: '' }),
 
   JWT_SECRET: str(),
+
+  COGNITO_USER_POOL_ID: str({ default: '' }),
+  COGNITO_LEGACY_USER_POOL_ID: str({ default: '' }),
 });

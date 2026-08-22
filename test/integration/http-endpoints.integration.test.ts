@@ -3,14 +3,21 @@ import { FastifyInstance } from 'fastify';
 import { dataSource } from '@/infra/database/dataSource';
 import { UserEntity } from '@/infra/database/entities';
 import { buildApp } from '@/factory/build-app';
+import { CognitoUserDirectoryPort } from '@/usecase/ports/cognito-user-directory.port';
 import { initTestDb } from './helpers';
 
 describe('HTTP endpoints (real Postgres via Docker)', () => {
   let app: FastifyInstance;
+  const cognitoUserDirectory: CognitoUserDirectoryPort = {
+    findUserBySub: jest.fn().mockResolvedValue(null),
+    findUserByEmail: jest.fn().mockResolvedValue(null),
+    tombstoneUser: jest.fn(),
+    deleteUser: jest.fn(),
+  };
 
   beforeAll(async () => {
     await initTestDb();
-    app = buildApp({ dataSource });
+    app = buildApp({ dataSource, cognitoUserDirectory });
     await app.ready();
   });
 
@@ -149,6 +156,25 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ userId: user.id, months: [] });
+    });
+  });
+
+  describe('DELETE /users/me', () => {
+    it('deletes the authenticated user identified by the x-user-id header', async () => {
+      const user = await createUser('delete-me-a@test.com');
+
+      const response = await request(app.server).delete('/users/me').set('x-user-id', user.id);
+
+      expect(response.status).toBe(204);
+
+      const stillFound = await dataSource.getRepository(UserEntity).findOneBy({ id: user.id });
+      expect(stillFound).toBeNull();
+    });
+
+    it('returns 401 when the x-user-id header is missing', async () => {
+      const response = await request(app.server).delete('/users/me');
+
+      expect(response.status).toBe(401);
     });
   });
 });

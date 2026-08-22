@@ -31,4 +31,8 @@ export class UserRepository implements RepositoryInterface<UserEntity> {
   createQueryBuilder(alias: string): SelectQueryBuilder<UserEntity> {
     return this.repository.createQueryBuilder(alias);
   }
+
+  async softDelete(criteria: FindOptionsWhere<UserEntity>): Promise<void> {
+    await this.repository.softDelete(criteria);
+  }
 }

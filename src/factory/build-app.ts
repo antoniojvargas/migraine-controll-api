@@ -1,6 +1,8 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import { DataSource } from 'typeorm';
+import { CognitoIdentityProviderClient } from '@aws-sdk/client-cognito-identity-provider';
 import { logger } from '@/config/logger';
+import { envs } from '@/config/env';
 import { registerErrorHandler } from '@/adapter/http/error-handler';
 import { createGenReqId, registerRequestContext } from '@/adapter/http/plugins/request-context';
 import { registerCors, CorsOptions } from '@/adapter/http/plugins/cors';
@@ -16,6 +18,7 @@ import { UserResponseRepository } from '@/infra/database/repository/user-respons
 import { QuestionRepository } from '@/infra/database/repository/question.repository';
 import { SelectionRepository } from '@/infra/database/repository/selection.repository';
 import { TranslationRepository } from '@/infra/database/repository/translation.repository';
+import { UserRepository } from '@/infra/database/repository/user.repository';
 import { AppVersionEntity } from '@/infra/database/entities/app-version.entity';
 import { PreferredAnswersEntity } from '@/infra/database/entities/preferred-answers.entity';
 import { AcuteTreatmentWorseFeedbackOptionsEntity } from '@/infra/database/entities/acute-treatment-worse-feedback-options.entity';
@@ -27,7 +30,10 @@ import {
   QuestionEntity,
   SelectionEntity,
   TranslationEntity,
+  UserEntity,
 } from '@/infra/database/entities';
+import { CognitoUserDirectoryAdapter } from '@/infra/aws/cognito-user-directory.adapter';
+import { CognitoUserDirectoryPort } from '@/usecase/ports/cognito-user-directory.port';
 import { FindAppVersionUc } from '@/usecase/find-app-version.uc';
 import { UpsertPreferredAnswerUc } from '@/usecase/upsert-preferred-answer.uc';
 import { FindPreferredAnswersByUserUc } from '@/usecase/find-preferred-answers-by-user.uc';
@@ -36,6 +42,7 @@ import { CreateProfileUc } from '@/usecase/create-profile.uc';
 import { CreateMigraineLogUc } from '@/usecase/create-migraine-log.uc';
 import { CreatePreventiveTreatmentUc } from '@/usecase/create-preventive-treatment.uc';
 import { FindCalendarViewUc } from '@/usecase/find-calendar-view.uc';
+import { CognitoDeleteUserUc } from '@/usecase/cognito-delete-user.uc';
 import {
   AppVersionController,
   registerAppVersionRoutes,
@@ -61,12 +68,14 @@ import {
   CalendarViewController,
   registerCalendarViewRoutes,
 } from '@/adapter/http/calendar-view.controller';
+import { UserController, registerUserRoutes } from '@/adapter/http/user.controller';
 
 export interface BuildAppOptions {
   dataSource?: DataSource;
   cors?: CorsOptions;
   rateLimit?: RateLimitOptions;
   docs?: DocsOptions;
+  cognitoUserDirectory?: CognitoUserDirectoryPort;
 }
 
 export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
@@ -112,6 +121,14 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
     const translationRepository = new TranslationRepository(
       dataSource.getRepository(TranslationEntity),
     );
+    const userRepository = new UserRepository(dataSource.getRepository(UserEntity));
+    const cognitoUserDirectory =
+      options.cognitoUserDirectory ??
+      new CognitoUserDirectoryAdapter(
+        new CognitoIdentityProviderClient({ region: envs.AWS_REGION }),
+        envs.COGNITO_USER_POOL_ID,
+        envs.COGNITO_LEGACY_USER_POOL_ID === '' ? undefined : envs.COGNITO_LEGACY_USER_POOL_ID,
+      );
 
     registerAppVersionRoutes(
       app,
@@ -160,6 +177,13 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
     registerCalendarViewRoutes(
       app,
       new CalendarViewController(new FindCalendarViewUc(migraineLogRepository)),
+    );
+    registerUserRoutes(
+      app,
+      new UserController(
+        new CognitoDeleteUserUc(userRepository, cognitoUserDirectory),
+        userRepository,
+      ),
     );
   }
 
