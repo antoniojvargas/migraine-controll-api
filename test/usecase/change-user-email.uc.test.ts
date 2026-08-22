@@ -20,7 +20,7 @@ describe('ChangeUserEmailUc', () => {
 
     expect(userRepository.update).toHaveBeenCalledWith(
       { id: 'u-1' },
-      { email: 'new@b.com', originalEmail: 'old@b.com' },
+      { email: 'new@b.com', originalEmail: 'old@b.com', emailChangedAt: expect.any(Date) },
     );
     expect(result).toEqual({
       id: 'u-1',

@@ -29,4 +29,7 @@ export class UserEntity {
 
   @Column({ name: 'original_email', type: 'varchar', nullable: true })
   originalEmail!: string | null;
+
+  @Column({ name: 'email_changed_at', type: 'timestamptz', nullable: true })
+  emailChangedAt!: Date | null;
 }

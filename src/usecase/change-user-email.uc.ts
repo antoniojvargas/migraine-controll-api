@@ -15,7 +15,7 @@ export class ChangeUserEmailUc
       user.updateUser({ email: input.email, originalEmail: user.email });
       await this.userRepository.update(
         { id },
-        { email: user.email, originalEmail: user.originalEmail },
+        { email: user.email, originalEmail: user.originalEmail, emailChangedAt: new Date() },
       );
       return this.toOutput(user);
     } catch (error) {

@@ -17,15 +17,25 @@ de autenticación de Migraine Control API junto con sus tres triggers Lambda.
 
 ## Triggers
 
-| Trigger             | Handler                                                 | Código                        | Responsabilidad                                                                                                                                                                                                                                  |
-| ------------------- | ------------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Pre-SignUp          | `src/infra/aws/cognito-triggers/pre-sign-up.ts`         | `pre-sign-up.handler`         | Bloquea dominios de email no permitidos; auto-confirma y auto-verifica únicamente cuando el alta viene de `PreSignUp_AdminCreateUser` (alta administrativa). El self-signup normal sigue el flujo estándar de confirmación por email de Cognito. |
-| Post-Confirmation   | `src/infra/aws/cognito-triggers/post-confirmation.ts`   | `post-confirmation.handler`   | Se ejecuta tras `PostConfirmation_ConfirmSignUp`. Punto de extensión para provisionar el usuario en la base de datos de la API (hoy solo registra el evento).                                                                                    |
-| Post-Authentication | `src/infra/aws/cognito-triggers/post-authentication.ts` | `post-authentication.handler` | Se ejecuta en cada login exitoso. Punto de extensión para auditoría/último acceso (hoy solo registra el evento).                                                                                                                                 |
+| Trigger             | Handler                                                 | Código                        | Responsabilidad                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------- | ------------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pre-SignUp          | `src/infra/aws/cognito-triggers/pre-sign-up.ts`         | `pre-sign-up.handler`         | Bloquea dominios de email no permitidos. Ejecuta `CognitoSignUpUc` (`src/usecase/cognito-sign-up.uc.ts`), que rechaza el alta si el email ya está registrado en `users`, o si fue el `original_email` de otro usuario que lo cambió hace menos de 30 días (cooldown de reutilización). Auto-confirma y auto-verifica únicamente cuando el alta viene de `PreSignUp_AdminCreateUser` (alta administrativa); el self-signup normal sigue el flujo estándar de confirmación por email de Cognito. |
+| Post-Confirmation   | `src/infra/aws/cognito-triggers/post-confirmation.ts`   | `post-confirmation.handler`   | Se ejecuta tras `PostConfirmation_ConfirmSignUp`. Punto de extensión para provisionar el usuario en la base de datos de la API (hoy solo registra el evento).                                                                                                                                                                                                                                                                                                                                  |
+| Post-Authentication | `src/infra/aws/cognito-triggers/post-authentication.ts` | `post-authentication.handler` | Se ejecuta en cada login exitoso. Punto de extensión para auditoría/último acceso (hoy solo registra el evento).                                                                                                                                                                                                                                                                                                                                                                               |
 
 Los tres handlers son funciones puras `(event) => Promise<event>` que reciben
 y devuelven el evento del trigger sin mutar su forma, tal como exige el
-contrato de Cognito Lambda triggers.
+contrato de Cognito Lambda triggers. Al bloquear el sign-up, `pre-sign-up.ts`
+propaga el error lanzado por `CognitoSignUpUc`, tal como exige Cognito para
+abortar el alta.
+
+`PreSignUpFunction` es la única que necesita conectividad a la base de datos
+Postgres de la API (para las validaciones de duplicados/cooldown), por lo que
+recibe las variables `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
+y `JWT_SECRET` (requerido por la validación de entorno compartida, aunque no
+se usa en este trigger). Si la base de datos vive dentro de una VPC privada,
+añadir `VpcConfig` a `PreSignUpFunction` con las subnets/security groups
+correspondientes.
 
 ## Despliegue
 
@@ -52,7 +62,12 @@ contrato de Cognito Lambda triggers.
      --parameter-overrides \
        Stage=dev \
        LambdaCodeS3Bucket=<bucket> \
-       LambdaCodeS3Key=cognito-triggers/<version>.zip
+       LambdaCodeS3Key=cognito-triggers/<version>.zip \
+       DbHost=<db-host> \
+       DbUser=<db-user> \
+       DbPassword=<db-password> \
+       DbName=<db-name> \
+       JwtSecret=<jwt-secret>
    ```
 
 4. Los `Outputs` del stack (`UserPoolId`, `UserPoolClientId`, `UserPoolArn`)
