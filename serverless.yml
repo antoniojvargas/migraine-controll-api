@@ -43,7 +43,7 @@ package:
 
 functions:
   users:
-    handler: dist/infra/aws/http-handlers/app.handler.handler
+    handler: dist/adapter/lambda/users.lambda.handler
     role: UsersLambdaRole
     description: >
       Dominio users: gestion del ciclo de vida de la cuenta (borrado de
@@ -57,7 +57,7 @@ functions:
           method: ANY
 
   profiles:
-    handler: dist/infra/aws/http-handlers/app.handler.handler
+    handler: dist/adapter/lambda/profiles.lambda.handler
     role: ProfilesLambdaRole
     description: 'Dominio profiles: creacion y actualizacion del perfil del usuario.'
     events:
@@ -69,7 +69,7 @@ functions:
           method: ANY
 
   sessions:
-    handler: dist/infra/aws/http-handlers/app.handler.handler
+    handler: dist/adapter/lambda/sessions.lambda.handler
     role: SessionsLambdaRole
     description: >
       Dominio sessions: gestion de sesiones autenticadas (base para
@@ -83,7 +83,7 @@ functions:
           method: ANY
 
   migraineLogs:
-    handler: dist/infra/aws/http-handlers/app.handler.handler
+    handler: dist/adapter/lambda/migraine-logs.lambda.handler
     role: MigraineLogsLambdaRole
     description: >
       Dominio migraine-logs: registro de crisis y vista de calendario
@@ -100,7 +100,7 @@ functions:
           method: ANY
 
   preventiveTreatments:
-    handler: dist/infra/aws/http-handlers/app.handler.handler
+    handler: dist/adapter/lambda/preventive-treatments.lambda.handler
     role: PreventiveTreatmentsLambdaRole
     description: 'Dominio preventive-treatments: tratamientos preventivos del usuario.'
     events:
@@ -112,7 +112,7 @@ functions:
           method: ANY
 
   notifications:
-    handler: dist/infra/aws/http-handlers/app.handler.handler
+    handler: dist/adapter/lambda/notifications.lambda.handler
     role: NotificationsLambdaRole
     description: >
       Dominio notifications: base para registro de dispositivos y envio de
@@ -126,7 +126,7 @@ functions:
           method: ANY
 
   terra:
-    handler: dist/infra/aws/http-handlers/app.handler.handler
+    handler: dist/adapter/lambda/terra.lambda.handler
     role: TerraLambdaRole
     description: >
       Dominio terra: base para la integracion con Terra (datos de
