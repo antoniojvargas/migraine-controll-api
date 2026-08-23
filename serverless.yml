@@ -1,0 +1,338 @@
+service: migraine-control-api
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ${opt:region, env:AWS_REGION, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  memorySize: 256
+  timeout: 15
+  logRetentionInDays: 30
+  httpApi:
+    cors: true
+    payload: '2.0'
+  environment:
+    NODE_ENV: ${self:custom.nodeEnv.${self:provider.stage}, 'production'}
+    DB_HOST: ${env:DB_HOST}
+    DB_PORT: ${env:DB_PORT, '5432'}
+    DB_USER: ${env:DB_USER}
+    DB_PASSWORD: ${env:DB_PASSWORD}
+    DB_NAME: ${env:DB_NAME}
+    AWS_REGION: ${self:provider.region}
+    JWT_SECRET: ${env:JWT_SECRET}
+    COGNITO_USER_POOL_ID: ${env:COGNITO_USER_POOL_ID, ''}
+    COGNITO_LEGACY_USER_POOL_ID: ${env:COGNITO_LEGACY_USER_POOL_ID, ''}
+
+custom:
+  nodeEnv:
+    dev: development
+    staging: production
+    prod: production
+
+package:
+  individually: false
+  patterns:
+    - 'dist/**'
+    - 'node_modules/**'
+    - '!node_modules/.bin/**'
+    - '!test/**'
+    - '!infra/**'
+    - '!*.md'
+
+functions:
+  users:
+    handler: dist/infra/aws/http-handlers/app.handler.handler
+    role: UsersLambdaRole
+    description: >
+      Dominio users: gestion del ciclo de vida de la cuenta (borrado de
+      cuenta autenticado via DELETE /users/me y endpoints relacionados).
+    events:
+      - httpApi:
+          path: /users/me
+          method: ANY
+      - httpApi:
+          path: /users/me/{proxy+}
+          method: ANY
+
+  profiles:
+    handler: dist/infra/aws/http-handlers/app.handler.handler
+    role: ProfilesLambdaRole
+    description: 'Dominio profiles: creacion y actualizacion del perfil del usuario.'
+    events:
+      - httpApi:
+          path: /users/{userId}/profiles
+          method: ANY
+      - httpApi:
+          path: /users/{userId}/profiles/{proxy+}
+          method: ANY
+
+  sessions:
+    handler: dist/infra/aws/http-handlers/app.handler.handler
+    role: SessionsLambdaRole
+    description: >
+      Dominio sessions: gestion de sesiones autenticadas (base para
+      login/refresh/logout).
+    events:
+      - httpApi:
+          path: /sessions
+          method: ANY
+      - httpApi:
+          path: /sessions/{proxy+}
+          method: ANY
+
+  migraineLogs:
+    handler: dist/infra/aws/http-handlers/app.handler.handler
+    role: MigraineLogsLambdaRole
+    description: >
+      Dominio migraine-logs: registro de crisis y vista de calendario
+      asociada.
+    events:
+      - httpApi:
+          path: /users/{userId}/migraine-logs
+          method: ANY
+      - httpApi:
+          path: /users/{userId}/migraine-logs/{proxy+}
+          method: ANY
+      - httpApi:
+          path: /users/{userId}/calendar-view
+          method: ANY
+
+  preventiveTreatments:
+    handler: dist/infra/aws/http-handlers/app.handler.handler
+    role: PreventiveTreatmentsLambdaRole
+    description: 'Dominio preventive-treatments: tratamientos preventivos del usuario.'
+    events:
+      - httpApi:
+          path: /users/{userId}/preventive-treatments
+          method: ANY
+      - httpApi:
+          path: /users/{userId}/preventive-treatments/{proxy+}
+          method: ANY
+
+  notifications:
+    handler: dist/infra/aws/http-handlers/app.handler.handler
+    role: NotificationsLambdaRole
+    description: >
+      Dominio notifications: base para registro de dispositivos y envio de
+      notificaciones push.
+    events:
+      - httpApi:
+          path: /notifications
+          method: ANY
+      - httpApi:
+          path: /notifications/{proxy+}
+          method: ANY
+
+  terra:
+    handler: dist/infra/aws/http-handlers/app.handler.handler
+    role: TerraLambdaRole
+    description: >
+      Dominio terra: base para la integracion con Terra (datos de
+      wearables) via webhook y sincronizacion.
+    events:
+      - httpApi:
+          path: /terra
+          method: ANY
+      - httpApi:
+          path: /terra/{proxy+}
+          method: ANY
+
+resources:
+  Resources:
+    UsersLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-${self:provider.stage}-users-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: users-lambda-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: '*'
+                - Effect: Allow
+                  Action:
+                    - cognito-idp:AdminGetUser
+                    - cognito-idp:AdminDeleteUser
+                    - cognito-idp:AdminUpdateUserAttributes
+                    - cognito-idp:ListUsers
+                  Resource:
+                    - !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${env:COGNITO_USER_POOL_ID, "*"}'
+                    - !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${env:COGNITO_LEGACY_USER_POOL_ID, "*"}'
+
+    ProfilesLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-${self:provider.stage}-profiles-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: profiles-lambda-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: '*'
+                - Effect: Allow
+                  Action:
+                    - cognito-idp:AdminUpdateUserAttributes
+                  Resource:
+                    - !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${env:COGNITO_USER_POOL_ID, "*"}'
+                    - !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${env:COGNITO_LEGACY_USER_POOL_ID, "*"}'
+
+    SessionsLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-${self:provider.stage}-sessions-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: sessions-lambda-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: '*'
+                - Effect: Allow
+                  Action:
+                    - dynamodb:GetItem
+                    - dynamodb:PutItem
+                    - dynamodb:UpdateItem
+                    - dynamodb:DeleteItem
+                    - dynamodb:Query
+                  Resource:
+                    - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:service}-${self:provider.stage}-sessions'
+                    - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${self:service}-${self:provider.stage}-sessions/index/*'
+
+    MigraineLogsLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-${self:provider.stage}-migraine-logs-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: migraine-logs-lambda-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: '*'
+
+    PreventiveTreatmentsLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-${self:provider.stage}-preventive-treatments-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: preventive-treatments-lambda-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: '*'
+
+    NotificationsLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-${self:provider.stage}-notifications-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: notifications-lambda-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: '*'
+                - Effect: Allow
+                  Action:
+                    - sns:Publish
+                  Resource:
+                    - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${self:service}-${self:provider.stage}-notifications'
+
+    TerraLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-${self:provider.stage}-terra-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: terra-lambda-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: '*'
+                - Effect: Allow
+                  Action:
+                    - secretsmanager:GetSecretValue
+                  Resource:
+                    - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${self:service}-${self:provider.stage}-terra-*'
