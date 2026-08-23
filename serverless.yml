@@ -26,6 +26,8 @@ provider:
     COGNITO_LEGACY_USER_POOL_ID: ${env:COGNITO_LEGACY_USER_POOL_ID, ''}
     NOTIFICATION_QUEUE_URL: !Ref NotificationQueue
     WEATHER_QUEUE_URL: !Ref WeatherQueue
+    TERRA_RAW_PAYLOADS_BUCKET: !Ref TerraRawPayloadsBucket
+    CA_BUNDLES_BUCKET: !Ref CaBundlesBucket
 
 custom:
   nodeEnv:
@@ -350,6 +352,37 @@ resources:
                     - sqs:GetQueueAttributes
                   Resource:
                     - !GetAtt WeatherQueue.Arn
+                - Effect: Allow
+                  Action:
+                    - s3:PutObject
+                    - s3:GetObject
+                  Resource:
+                    - !Sub '${TerraRawPayloadsBucket.Arn}/*'
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                  Resource:
+                    - !Sub '${CaBundlesBucket.Arn}/*'
+
+    TerraRawPayloadsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:service}-${self:provider.stage}-terra-raw-payloads
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+
+    CaBundlesBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:service}-${self:provider.stage}-ca-bundles
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
 
     NotificationQueue:
       Type: AWS::SQS::Queue

@@ -25,4 +25,7 @@ export const envs = cleanEnv(process.env, {
 
   NOTIFICATION_QUEUE_URL: str({ default: '' }),
   WEATHER_QUEUE_URL: str({ default: '' }),
+
+  TERRA_RAW_PAYLOADS_BUCKET: str({ default: '' }),
+  CA_BUNDLES_BUCKET: str({ default: '' }),
 });
