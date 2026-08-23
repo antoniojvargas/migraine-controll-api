@@ -22,4 +22,7 @@ export const envs = cleanEnv(process.env, {
 
   COGNITO_USER_POOL_ID: str({ default: '' }),
   COGNITO_LEGACY_USER_POOL_ID: str({ default: '' }),
+
+  NOTIFICATION_QUEUE_URL: str({ default: '' }),
+  WEATHER_QUEUE_URL: str({ default: '' }),
 });
