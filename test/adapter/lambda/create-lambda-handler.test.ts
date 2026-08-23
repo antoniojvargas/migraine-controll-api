@@ -11,6 +11,11 @@ jest.mock('@fastify/aws-lambda', () => ({
 }));
 jest.mock('@/infra/database/dataSource', () => ({ dataSource: dataSourceMock }));
 jest.mock('@/config/logger', () => ({ logger: { error: jest.fn() } }));
+jest.mock('@/config/instrument', () => ({}));
+jest.mock('@sentry/node', () => ({
+  captureException: jest.fn(),
+  flush: jest.fn().mockResolvedValue(true),
+}));
 
 import { createLambdaHandler } from '@/adapter/lambda/create-lambda-handler';
 

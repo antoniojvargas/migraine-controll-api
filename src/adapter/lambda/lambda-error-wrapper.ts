@@ -1,4 +1,5 @@
 import { APIGatewayProxyEventV2, APIGatewayProxyResultV2, Context } from 'aws-lambda';
+import * as Sentry from '@sentry/node';
 import { logger } from '@/config/logger';
 
 export type LambdaHttpHandler = (
@@ -31,6 +32,15 @@ export const withErrorWrapper = (domain: string, handler: LambdaHttpHandler): La
         },
         'Unhandled Lambda error',
       );
+      Sentry.captureException(err, {
+        tags: { domain },
+        extra: {
+          requestId: context.awsRequestId,
+          path: event.rawPath,
+          method: event.requestContext?.http?.method,
+        },
+      });
+      await Sentry.flush(2000);
       return INTERNAL_ERROR_RESPONSE;
     }
   };

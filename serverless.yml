@@ -28,6 +28,7 @@ provider:
     WEATHER_QUEUE_URL: !Ref WeatherQueue
     TERRA_RAW_PAYLOADS_BUCKET: !Ref TerraRawPayloadsBucket
     CA_BUNDLES_BUCKET: !Ref CaBundlesBucket
+    SENTRY_DSN: ${env:SENTRY_DSN, ''}
 
 custom:
   nodeEnv:

@@ -1,3 +1,4 @@
+import '@/config/instrument';
 import awsLambdaFastify from '@fastify/aws-lambda';
 import { FastifyInstance } from 'fastify';
 import { dataSource } from '@/infra/database/dataSource';

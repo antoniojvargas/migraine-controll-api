@@ -28,4 +28,6 @@ export const envs = cleanEnv(process.env, {
 
   TERRA_RAW_PAYLOADS_BUCKET: str({ default: '' }),
   CA_BUNDLES_BUCKET: str({ default: '' }),
+
+  SENTRY_DSN: str({ default: '' }),
 });

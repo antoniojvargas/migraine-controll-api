@@ -1,9 +1,14 @@
 import { Context } from 'aws-lambda';
+import * as Sentry from '@sentry/node';
 import { logger } from '@/config/logger';
 import { withErrorWrapper } from '@/adapter/lambda/lambda-error-wrapper';
 
 jest.mock('@/config/logger', () => ({
   logger: { error: jest.fn() },
+}));
+jest.mock('@sentry/node', () => ({
+  captureException: jest.fn(),
+  flush: jest.fn().mockResolvedValue(true),
 }));
 
 const buildEvent = (): never =>
@@ -17,6 +22,8 @@ const buildContext = (): Context => ({ awsRequestId: 'req-1' }) as Context;
 describe('withErrorWrapper', () => {
   afterEach(() => {
     (logger.error as jest.Mock).mockReset();
+    (Sentry.captureException as jest.Mock).mockReset();
+    (Sentry.flush as jest.Mock).mockClear();
   });
 
   it('returns the handler result when it does not throw', async () => {
@@ -46,6 +53,14 @@ describe('withErrorWrapper', () => {
       }),
       'Unhandled Lambda error',
     );
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      error,
+      expect.objectContaining({
+        tags: { domain: 'users' },
+        extra: expect.objectContaining({ requestId: 'req-1', path: '/users/me', method: 'DELETE' }),
+      }),
+    );
+    expect(Sentry.flush).toHaveBeenCalledWith(2000);
     expect(result).toMatchObject({ statusCode: 500 });
     expect(JSON.parse((result as { body: string }).body)).toEqual({
       statusCode: 500,
