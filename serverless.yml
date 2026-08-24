@@ -155,6 +155,18 @@ functions:
           rate: rate(15 minutes)
           enabled: true
 
+  weeklyMigraineTrend:
+    handler: dist/adapter/lambda/weekly-migraine-trend.lambda.handler
+    role: WeeklyMigraineTrendLambdaRole
+    description: >
+      Job programado: compara la cantidad de migranas de la semana actual
+      contra el promedio historico del usuario (calculateAverageMigrainesPerWeek)
+      y encola una notificacion cuando la variacion es significativa.
+    events:
+      - schedule:
+          rate: cron(0 9 ? * MON *)
+          enabled: true
+
   terra:
     handler: dist/adapter/lambda/terra.lambda.handler
     role: TerraLambdaRole
@@ -393,6 +405,35 @@ resources:
               Action: sts:AssumeRole
         Policies:
           - PolicyName: preventive-treatment-reminder-lambda-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: '*'
+                - Effect: Allow
+                  Action:
+                    - sqs:SendMessage
+                    - sqs:GetQueueAttributes
+                  Resource:
+                    - !GetAtt NotificationQueue.Arn
+
+    WeeklyMigraineTrendLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-${self:provider.stage}-weekly-migraine-trend-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: weekly-migraine-trend-lambda-policy
             PolicyDocument:
               Version: '2012-10-17'
               Statement:
