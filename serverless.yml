@@ -130,6 +130,19 @@ functions:
           path: /notifications/{proxy+}
           method: ANY
 
+  notificationQueueConsumer:
+    handler: dist/adapter/lambda/notification-queue-consumer.lambda.handler
+    role: NotificationQueueConsumerLambdaRole
+    description: >
+      Consumidor de NOTIFICATION_QUEUE: despacha el push real via SNS,
+      reportando fallos por mensaje para reintento y dejando que la
+      redrive policy de la cola envie los agotados a la dead-letter queue.
+    events:
+      - sqs:
+          arn: !GetAtt NotificationQueue.Arn
+          batchSize: 10
+          functionResponseType: ReportBatchItemFailures
+
   terra:
     handler: dist/adapter/lambda/terra.lambda.handler
     role: TerraLambdaRole
@@ -320,6 +333,41 @@ resources:
                   Resource:
                     - !GetAtt NotificationQueue.Arn
 
+    NotificationQueueConsumerLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-${self:provider.stage}-notification-consumer-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: notification-consumer-lambda-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: '*'
+                - Effect: Allow
+                  Action:
+                    - sqs:ReceiveMessage
+                    - sqs:DeleteMessage
+                    - sqs:GetQueueAttributes
+                  Resource:
+                    - !GetAtt NotificationQueue.Arn
+                - Effect: Allow
+                  Action:
+                    - sns:Publish
+                  Resource:
+                    - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:endpoint/*'
+
     TerraLambdaRole:
       Type: AWS::IAM::Role
       Properties:
@@ -385,11 +433,20 @@ resources:
           IgnorePublicAcls: true
           RestrictPublicBuckets: true
 
+    NotificationDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${self:provider.stage}-notification-dlq
+        MessageRetentionPeriod: 1209600
+
     NotificationQueue:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: ${self:service}-${self:provider.stage}-notification-queue
         VisibilityTimeout: 60
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt NotificationDLQ.Arn
+          maxReceiveCount: 5
 
     WeatherQueue:
       Type: AWS::SQS::Queue
