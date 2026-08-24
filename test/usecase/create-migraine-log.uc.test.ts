@@ -5,7 +5,15 @@ import { UserResponseRepository } from '@/infra/database/repository/user-respons
 import { QuestionRepository } from '@/infra/database/repository/question.repository';
 import { SelectionRepository } from '@/infra/database/repository/selection.repository';
 import { TranslationRepository } from '@/infra/database/repository/translation.repository';
+import { PushNotificationTokenRepository } from '@/infra/database/repository/push-notification-token.repository';
+import { notifyUsers } from '@/usecase/notification/notificationHelpers';
 import { createQueryBuilderMock } from './helpers';
+
+jest.mock('@/usecase/notification/notificationHelpers', () => ({
+  notifyUsers: jest.fn(),
+}));
+
+const notifyUsersMock = notifyUsers as jest.Mock;
 
 const baseInput = (): {
   userId: string;
@@ -31,6 +39,7 @@ interface Mocks {
   questionRepository: QuestionRepository;
   selectionRepository: SelectionRepository;
   translationRepository: TranslationRepository;
+  pushNotificationTokenRepository: PushNotificationTokenRepository;
 }
 
 describe('CreateMigraineLogUc', () => {
@@ -50,6 +59,9 @@ describe('CreateMigraineLogUc', () => {
       create: jest.fn(),
     } as unknown as SelectionRepository;
     const translationRepository = { create: jest.fn() } as unknown as TranslationRepository;
+    const pushNotificationTokenRepository = {
+      findAllBy: jest.fn().mockResolvedValue([]),
+    } as unknown as PushNotificationTokenRepository;
     const uc = new CreateMigraineLogUc(
       migraineLogRepository,
       preferredAnswersRepository,
@@ -57,6 +69,7 @@ describe('CreateMigraineLogUc', () => {
       questionRepository,
       selectionRepository,
       translationRepository,
+      pushNotificationTokenRepository,
     );
     return {
       uc,
@@ -66,8 +79,13 @@ describe('CreateMigraineLogUc', () => {
       questionRepository,
       selectionRepository,
       translationRepository,
+      pushNotificationTokenRepository,
     };
   };
+
+  afterEach(() => {
+    notifyUsersMock.mockReset();
+  });
 
   it('creates the log, links the response and upserts the preferred answer', async () => {
     const {
@@ -215,13 +233,14 @@ describe('CreateMigraineLogUc', () => {
     ).rejects.toMatchObject({ statusCode: 400, code: 'DOMAIN_VALIDATION_ERROR' });
   });
 
-  it('reports recurrent symptoms with >= 5 occurrences', async () => {
+  it('reports recurrent symptoms with >= 5 occurrences and enqueues a suggestion notification', async () => {
     const {
       uc,
       migraineLogRepository,
       questionRepository,
       userResponseRepository,
       preferredAnswersRepository,
+      pushNotificationTokenRepository,
     } = build();
     (migraineLogRepository.create as jest.Mock).mockResolvedValue({ id: 'ml-1' });
     (questionRepository.findOneBy as jest.Mock).mockResolvedValue({
@@ -237,6 +256,9 @@ describe('CreateMigraineLogUc', () => {
       }),
     );
     (preferredAnswersRepository.findOneBy as jest.Mock).mockResolvedValue(null);
+    const tokens = [{ id: 'token-1', token: 'abc' }];
+    (pushNotificationTokenRepository.findAllBy as jest.Mock).mockResolvedValue(tokens);
+    notifyUsersMock.mockResolvedValue(undefined);
 
     const result = await uc.execute({
       ...baseInput(),
@@ -246,5 +268,47 @@ describe('CreateMigraineLogUc', () => {
     expect(result.recurrentSymptoms).toEqual([
       { selectionId: 'sel-1', answerText: null, occurrences: 5 },
     ]);
+    expect(pushNotificationTokenRepository.findAllBy).toHaveBeenCalledWith({
+      user: { id: 'u-1' },
+    });
+    expect(notifyUsersMock).toHaveBeenCalledWith(
+      [{ userId: 'u-1', tokens }],
+      expect.objectContaining({
+        title: expect.any(String),
+        body: expect.stringContaining('5'),
+        data: { selectionId: 'sel-1', occurrences: '5' },
+      }),
+    );
+  });
+
+  it('does not enqueue notifications when no symptom is recurrent', async () => {
+    const {
+      uc,
+      migraineLogRepository,
+      questionRepository,
+      userResponseRepository,
+      preferredAnswersRepository,
+      pushNotificationTokenRepository,
+    } = build();
+    (migraineLogRepository.create as jest.Mock).mockResolvedValue({ id: 'ml-1' });
+    (questionRepository.findOneBy as jest.Mock).mockResolvedValue({
+      id: 'q-1',
+      key: 'aura',
+      type: 'single',
+      order: 1,
+    });
+    (userResponseRepository.bulkCreate as jest.Mock).mockResolvedValue([{ id: 'r-1' }]);
+    (userResponseRepository.createQueryBuilder as jest.Mock).mockReturnValue(
+      createQueryBuilderMock({ getRawMany: [] }),
+    );
+    (preferredAnswersRepository.findOneBy as jest.Mock).mockResolvedValue(null);
+
+    await uc.execute({
+      ...baseInput(),
+      responses: [{ questionId: 'q-1', answerId: 'sel-1' }],
+    });
+
+    expect(pushNotificationTokenRepository.findAllBy).not.toHaveBeenCalled();
+    expect(notifyUsersMock).not.toHaveBeenCalled();
   });
 });

@@ -8,10 +8,12 @@ import { UserResponseRepository } from '@/infra/database/repository/user-respons
 import { QuestionRepository } from '@/infra/database/repository/question.repository';
 import { SelectionRepository } from '@/infra/database/repository/selection.repository';
 import { TranslationRepository } from '@/infra/database/repository/translation.repository';
+import { PushNotificationTokenRepository } from '@/infra/database/repository/push-notification-token.repository';
 import { MigraineLogEntity, UserResponseEntity } from '@/infra/database/entities';
 import { CreateMigraineLogInputDto } from '@/dto/create-migraine-log-input.dto';
 import { MigraineLogOutputDto, RecurrentSymptomOutputDto } from '@/dto/migraine-log-output.dto';
 import { handleErrorResponse } from '@/utils/handle-error-response';
+import { notifyUsers } from './notification/notificationHelpers';
 import { UseCaseInterface } from './usecase.interface';
 import { UserResponseBaseUc, ResolvedAnswer } from './user-response-base.uc';
 
@@ -21,6 +23,7 @@ export class CreateMigraineLogUc
 {
   private readonly migraineLogRepository: MigraineLogRepository;
   private readonly preferredAnswersRepository: PreferredAnswersRepository;
+  private readonly pushNotificationTokenRepository: PushNotificationTokenRepository;
 
   constructor(
     migraineLogRepository: MigraineLogRepository,
@@ -29,10 +32,12 @@ export class CreateMigraineLogUc
     questionRepository: QuestionRepository,
     selectionRepository: SelectionRepository,
     translationRepository: TranslationRepository,
+    pushNotificationTokenRepository: PushNotificationTokenRepository,
   ) {
     super(userResponseRepository, questionRepository, selectionRepository, translationRepository);
     this.migraineLogRepository = migraineLogRepository;
     this.preferredAnswersRepository = preferredAnswersRepository;
+    this.pushNotificationTokenRepository = pushNotificationTokenRepository;
   }
 
   execute = async (input: CreateMigraineLogInputDto): Promise<MigraineLogOutputDto> => {
@@ -69,7 +74,7 @@ export class CreateMigraineLogUc
       persistedResponses.forEach((entity, index) => domainResponses[index].assignId(entity.id));
 
       const recurrentSymptoms = await this.detectRecurrentSymptoms(log.userId);
-      this.onRecurrentSymptomsDetected(recurrentSymptoms);
+      await this.onRecurrentSymptomsDetected(recurrentSymptoms, log.userId);
 
       return {
         id: persistedLog.id,
@@ -109,8 +114,28 @@ export class CreateMigraineLogUc
       .filter((symptom) => symptom.occurrences >= 5);
   }
 
-  protected onRecurrentSymptomsDetected(symptoms: RecurrentSymptomOutputDto[]): void {
-    void symptoms;
+  protected async onRecurrentSymptomsDetected(
+    symptoms: RecurrentSymptomOutputDto[],
+    userId: string,
+  ): Promise<void> {
+    if (symptoms.length === 0) {
+      return;
+    }
+
+    const tokens = await this.pushNotificationTokenRepository.findAllBy({ user: { id: userId } });
+
+    await Promise.all(
+      symptoms.map((symptom) =>
+        notifyUsers([{ userId, tokens }], {
+          title: 'Recurring symptom detected',
+          body: `You've logged "${symptom.answerText ?? symptom.selectionId}" ${symptom.occurrences} times in the last 30 days. Consider adding it to your profile.`,
+          data: {
+            selectionId: symptom.selectionId ?? '',
+            occurrences: String(symptom.occurrences),
+          },
+        }),
+      ),
+    );
   }
 
   private mapLogToEntity(log: MigraineLog): DeepPartial<MigraineLogEntity> {

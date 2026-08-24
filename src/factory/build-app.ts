@@ -19,6 +19,7 @@ import { QuestionRepository } from '@/infra/database/repository/question.reposit
 import { SelectionRepository } from '@/infra/database/repository/selection.repository';
 import { TranslationRepository } from '@/infra/database/repository/translation.repository';
 import { UserRepository } from '@/infra/database/repository/user.repository';
+import { PushNotificationTokenRepository } from '@/infra/database/repository/push-notification-token.repository';
 import { AppVersionEntity } from '@/infra/database/entities/app-version.entity';
 import { PreferredAnswersEntity } from '@/infra/database/entities/preferred-answers.entity';
 import { AcuteTreatmentWorseFeedbackOptionsEntity } from '@/infra/database/entities/acute-treatment-worse-feedback-options.entity';
@@ -31,6 +32,7 @@ import {
   SelectionEntity,
   TranslationEntity,
   UserEntity,
+  PushNotificationTokenEntity,
 } from '@/infra/database/entities';
 import { CognitoUserDirectoryAdapter } from '@/infra/aws/cognito-user-directory.adapter';
 import { CognitoJwtVerifierAdapter } from '@/infra/aws/cognito-jwt-verifier.adapter';
@@ -118,6 +120,9 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
     const migraineLogRepository = new MigraineLogRepository(
       dataSource.getRepository(MigraineLogEntity),
     );
+    const pushNotificationTokenRepository = new PushNotificationTokenRepository(
+      dataSource.getRepository(PushNotificationTokenEntity),
+    );
     const preventiveTreatmentRepository = new PreventiveTreatmentRepository(
       dataSource.getRepository(PreventiveTreatmentEntity),
     );
@@ -185,6 +190,7 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
           questionRepository,
           selectionRepository,
           translationRepository,
+          pushNotificationTokenRepository,
         ),
       ),
     );
