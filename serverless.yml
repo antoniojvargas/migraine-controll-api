@@ -143,6 +143,18 @@ functions:
           batchSize: 10
           functionResponseType: ReportBatchItemFailures
 
+  preventiveTreatmentReminder:
+    handler: dist/adapter/lambda/preventive-treatment-reminder.lambda.handler
+    role: PreventiveTreatmentReminderLambdaRole
+    description: >
+      Job programado: revisa PreventiveTreatmentScheduleEntity con
+      reminder_before_log vencido y encola las notificaciones push
+      pendientes.
+    events:
+      - schedule:
+          rate: rate(15 minutes)
+          enabled: true
+
   terra:
     handler: dist/adapter/lambda/terra.lambda.handler
     role: TerraLambdaRole
@@ -367,6 +379,35 @@ resources:
                     - sns:Publish
                   Resource:
                     - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:endpoint/*'
+
+    PreventiveTreatmentReminderLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-${self:provider.stage}-preventive-treatment-reminder-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: preventive-treatment-reminder-lambda-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: '*'
+                - Effect: Allow
+                  Action:
+                    - sqs:SendMessage
+                    - sqs:GetQueueAttributes
+                  Resource:
+                    - !GetAtt NotificationQueue.Arn
 
     TerraLambdaRole:
       Type: AWS::IAM::Role

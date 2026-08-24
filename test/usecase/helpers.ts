@@ -1,4 +1,5 @@
 export interface QueryBuilderMock {
+  leftJoin: jest.Mock;
   leftJoinAndSelect: jest.Mock;
   innerJoin: jest.Mock;
   innerJoinAndSelect: jest.Mock;
@@ -19,6 +20,7 @@ export function createQueryBuilderMock(
 ): QueryBuilderMock {
   const query: QueryBuilderMock = {} as QueryBuilderMock;
   const chain = (): QueryBuilderMock => query;
+  query.leftJoin = jest.fn(chain);
   query.leftJoinAndSelect = jest.fn(chain);
   query.innerJoin = jest.fn(chain);
   query.innerJoinAndSelect = jest.fn(chain);
