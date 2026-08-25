@@ -143,6 +143,20 @@ functions:
           batchSize: 10
           functionResponseType: ReportBatchItemFailures
 
+  weatherQueueConsumer:
+    handler: dist/adapter/lambda/weather-queue-consumer.lambda.handler
+    role: WeatherQueueConsumerLambdaRole
+    description: >
+      Consumidor de WEATHER_QUEUE: dado un geohash6 ingiere datos de clima
+      de un proveedor externo y los guarda en WeatherTileEntity para
+      correlacion posterior con migranas, reportando fallos por mensaje
+      para reintento.
+    events:
+      - sqs:
+          arn: !GetAtt WeatherQueue.Arn
+          batchSize: 10
+          functionResponseType: ReportBatchItemFailures
+
   preventiveTreatmentReminder:
     handler: dist/adapter/lambda/preventive-treatment-reminder.lambda.handler
     role: PreventiveTreatmentReminderLambdaRole
@@ -392,6 +406,36 @@ resources:
                   Resource:
                     - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:endpoint/*'
 
+    WeatherQueueConsumerLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-${self:provider.stage}-weather-consumer-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: weather-consumer-lambda-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: '*'
+                - Effect: Allow
+                  Action:
+                    - sqs:ReceiveMessage
+                    - sqs:DeleteMessage
+                    - sqs:GetQueueAttributes
+                  Resource:
+                    - !GetAtt WeatherQueue.Arn
+
     PreventiveTreatmentReminderLambdaRole:
       Type: AWS::IAM::Role
       Properties:
@@ -530,8 +574,17 @@ resources:
           deadLetterTargetArn: !GetAtt NotificationDLQ.Arn
           maxReceiveCount: 5
 
+    WeatherDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${self:provider.stage}-weather-dlq
+        MessageRetentionPeriod: 1209600
+
     WeatherQueue:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: ${self:service}-${self:provider.stage}-weather-queue
         VisibilityTimeout: 60
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt WeatherDLQ.Arn
+          maxReceiveCount: 5

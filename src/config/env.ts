@@ -26,6 +26,8 @@ export const envs = cleanEnv(process.env, {
   NOTIFICATION_QUEUE_URL: str({ default: '' }),
   WEATHER_QUEUE_URL: str({ default: '' }),
 
+  WEATHER_PROVIDER_BASE_URL: str({ default: 'https://api.open-meteo.com/v1/forecast' }),
+
   TERRA_RAW_PAYLOADS_BUCKET: str({ default: '' }),
   CA_BUNDLES_BUCKET: str({ default: '' }),
 
