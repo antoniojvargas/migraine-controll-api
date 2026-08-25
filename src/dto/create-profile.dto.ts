@@ -4,7 +4,9 @@ export interface CreateProfileDto {
   gender: string;
   birthDate: string | Date;
   language: string;
-  geohash6: string;
+  geohash6?: string;
+  latitude?: number;
+  longitude?: number;
   appVersion?: string;
   hasTakenSurvey?: boolean;
 }

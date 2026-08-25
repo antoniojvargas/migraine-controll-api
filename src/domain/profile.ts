@@ -49,7 +49,7 @@ export class Profile {
     const gender = requireOneOf(dto.gender, GENDERS, 'gender');
     const birthDate = requirePastDate(dto.birthDate, 'birthDate');
     const language = requireLanguage(dto.language);
-    const geohash6 = requireGeohash6(dto.geohash6);
+    const geohash6 = requireGeohash6(dto.geohash6 ?? '');
     const appVersion = optionalSemver(dto.appVersion, 'appVersion');
     const hasTakenSurvey = dto.hasTakenSurvey ?? false;
     return new Profile(
