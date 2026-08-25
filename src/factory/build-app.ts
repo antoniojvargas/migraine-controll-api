@@ -20,6 +20,9 @@ import { SelectionRepository } from '@/infra/database/repository/selection.repos
 import { TranslationRepository } from '@/infra/database/repository/translation.repository';
 import { UserRepository } from '@/infra/database/repository/user.repository';
 import { PushNotificationTokenRepository } from '@/infra/database/repository/push-notification-token.repository';
+import { TerraUserRepository } from '@/infra/database/repository/terra-user.repository';
+import { TerraHealthDataRepository } from '@/infra/database/repository/terra-health-data.repository';
+import { TerraWebhookLogRepository } from '@/infra/database/repository/terra-webhook-log.repository';
 import { AppVersionEntity } from '@/infra/database/entities/app-version.entity';
 import { PreferredAnswersEntity } from '@/infra/database/entities/preferred-answers.entity';
 import { AcuteTreatmentWorseFeedbackOptionsEntity } from '@/infra/database/entities/acute-treatment-worse-feedback-options.entity';
@@ -33,7 +36,15 @@ import {
   TranslationEntity,
   UserEntity,
   PushNotificationTokenEntity,
+  TerraUserEntity,
+  TerraHealthDataEntity,
+  TerraWebhookLogEntity,
 } from '@/infra/database/entities';
+import { s3Client } from '@/infra/aws/s3Client';
+import { DatabaseDataProcessor } from '@/infra/processors/database-data-processor';
+import { S3DataProcessor } from '@/infra/processors/s3-data-processor';
+import { DocumentDBDataProcessor } from '@/infra/processors/document-db-data-processor';
+import { MultiDestinationDataProcessor } from '@/infra/processors/multi-destination-data-processor';
 import { CognitoUserDirectoryAdapter } from '@/infra/aws/cognito-user-directory.adapter';
 import { CognitoJwtVerifierAdapter } from '@/infra/aws/cognito-jwt-verifier.adapter';
 import { CognitoIdentityProviderAdapter } from '@/infra/aws/cognito-identity-provider.adapter';
@@ -51,6 +62,7 @@ import { CreateMigraineLogUc } from '@/usecase/create-migraine-log.uc';
 import { CreatePreventiveTreatmentUc } from '@/usecase/create-preventive-treatment.uc';
 import { FindCalendarViewUc } from '@/usecase/find-calendar-view.uc';
 import { CognitoDeleteUserUc } from '@/usecase/cognito-delete-user.uc';
+import { ProcessTerraWebhookUc } from '@/usecase/terra/process-terra-webhook.uc';
 import {
   AppVersionController,
   registerAppVersionRoutes,
@@ -77,6 +89,7 @@ import {
   registerCalendarViewRoutes,
 } from '@/adapter/http/calendar-view.controller';
 import { UserController, registerUserRoutes } from '@/adapter/http/user.controller';
+import { TerraController, registerTerraRoutes } from '@/adapter/http/terra.controller';
 
 export interface BuildAppOptions {
   dataSource?: DataSource;
@@ -135,6 +148,13 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
       dataSource.getRepository(TranslationEntity),
     );
     const userRepository = new UserRepository(dataSource.getRepository(UserEntity));
+    const terraUserRepository = new TerraUserRepository(dataSource.getRepository(TerraUserEntity));
+    const terraHealthDataRepository = new TerraHealthDataRepository(
+      dataSource.getRepository(TerraHealthDataEntity),
+    );
+    const terraWebhookLogRepository = new TerraWebhookLogRepository(
+      dataSource.getRepository(TerraWebhookLogEntity),
+    );
     const legacyUserPoolId =
       envs.COGNITO_LEGACY_USER_POOL_ID === '' ? undefined : envs.COGNITO_LEGACY_USER_POOL_ID;
     const cognitoClient = new CognitoIdentityProviderClient({ region: envs.AWS_REGION });
@@ -214,6 +234,25 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
     registerUserRoutes(
       app,
       new UserController(new CognitoDeleteUserUc(userRepository, cognitoUserDirectory)),
+    );
+
+    const multiDestinationDataProcessor = new MultiDestinationDataProcessor([
+      new DatabaseDataProcessor(terraUserRepository, terraHealthDataRepository),
+      new S3DataProcessor(s3Client, envs.TERRA_RAW_PAYLOADS_BUCKET),
+      new DocumentDBDataProcessor(s3Client, {
+        enabled: envs.DOCUMENTDB_ENABLED,
+        connectionUri: envs.DOCUMENTDB_URI,
+        databaseName: envs.DOCUMENTDB_DATABASE,
+        collectionName: envs.DOCUMENTDB_COLLECTION,
+        caBundleBucket: envs.CA_BUNDLES_BUCKET,
+        caBundleKey: envs.CA_BUNDLE_KEY,
+      }),
+    ]);
+    registerTerraRoutes(
+      app,
+      new TerraController(
+        new ProcessTerraWebhookUc(terraWebhookLogRepository, multiDestinationDataProcessor),
+      ),
     );
   }
 

@@ -11,10 +11,12 @@ import {
   AcuteTreatmentFeedbackController,
   registerAcuteTreatmentFeedbackRoutes,
 } from '@/adapter/http/acute-treatment-feedback.controller';
+import { TerraController, registerTerraRoutes } from '@/adapter/http/terra.controller';
 import { FindAppVersionUc } from '@/usecase/find-app-version.uc';
 import { UpsertPreferredAnswerUc } from '@/usecase/upsert-preferred-answer.uc';
 import { FindPreferredAnswersByUserUc } from '@/usecase/find-preferred-answers-by-user.uc';
 import { FindAcuteTreatmentWorseFeedbackOptionsUc } from '@/usecase/find-acute-treatment-worse-feedback-options.uc';
+import { ProcessTerraWebhookUc } from '@/usecase/terra/process-terra-webhook.uc';
 
 describe('adapter/http routes', () => {
   const buildApp = (): FastifyInstance => {
@@ -54,6 +56,12 @@ describe('adapter/http routes', () => {
       new AcuteTreatmentFeedbackController({
         execute: jest.fn(async () => [{ id: 'o-1', key: 'no_change', text: 'Sin cambios' }]),
       } as unknown as FindAcuteTreatmentWorseFeedbackOptionsUc),
+    );
+    registerTerraRoutes(
+      app,
+      new TerraController({
+        execute: jest.fn(async () => ({ status: 'processed', processedItems: 1, failedItems: 0 })),
+      } as unknown as ProcessTerraWebhookUc),
     );
     return app;
   };
@@ -104,6 +112,17 @@ describe('adapter/http routes', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toHaveLength(1);
     expect(response.json()[0]).toMatchObject({ key: 'no_change' });
+  });
+
+  it('POST /terra/webhook dispatches the payload and returns the processing summary', async () => {
+    const app = buildApp();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/terra/webhook',
+      payload: { type: 'sleep', user: { user_id: 'terra-1' }, data: [{ score: 80 }] },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: 'processed', processedItems: 1, failedItems: 0 });
   });
 
   it('keeps /health working without a dataSource', async () => {
