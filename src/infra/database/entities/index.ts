@@ -20,6 +20,7 @@ export { TerraHealthDataEntity } from './terra-health-data.entity';
 export { TerraUserEntity } from './terra-user.entity';
 export { TerraWebhookLogEntity } from './terra-webhook-log.entity';
 export { TranslationEntity } from './translation.entity';
+export { UserDailyVitalsEntity } from './user-daily-vitals.entity';
 export { UserEntity } from './user.entity';
 export { UserResponseEntity } from './user-response.entity';
 export { UserResponseAcuteTreatmentWorseFeedbackOptionsEntity } from './user-response-acute-treatment-worse-feedback-options.entity';

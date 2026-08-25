@@ -28,6 +28,11 @@ provider:
     WEATHER_QUEUE_URL: !Ref WeatherQueue
     TERRA_RAW_PAYLOADS_BUCKET: !Ref TerraRawPayloadsBucket
     CA_BUNDLES_BUCKET: !Ref CaBundlesBucket
+    CA_BUNDLE_KEY: ${env:CA_BUNDLE_KEY, 'global-bundle.pem'}
+    DOCUMENTDB_ENABLED: ${env:DOCUMENTDB_ENABLED, 'false'}
+    DOCUMENTDB_URI: ${env:DOCUMENTDB_URI, ''}
+    DOCUMENTDB_DATABASE: ${env:DOCUMENTDB_DATABASE, 'terra'}
+    DOCUMENTDB_COLLECTION: ${env:DOCUMENTDB_COLLECTION, 'health_data'}
     SENTRY_DSN: ${env:SENTRY_DSN, ''}
 
 custom:
@@ -179,6 +184,18 @@ functions:
     events:
       - schedule:
           rate: cron(0 9 ? * MON *)
+          enabled: true
+
+  userDailyVitalsAggregation:
+    handler: dist/adapter/lambda/user-daily-vitals-aggregation.lambda.handler
+    role: UserDailyVitalsAggregationLambdaRole
+    description: >
+      Job programado: agrega los datos de sueno/actividad crudos de
+      DocumentDB por usuario y dia (date_local) y los persiste en
+      UserDailyVitalsEntity para consultas de correlacion.
+    events:
+      - schedule:
+          rate: cron(0 3 * * ? *)
           enabled: true
 
   terra:
@@ -493,6 +510,34 @@ resources:
                     - sqs:GetQueueAttributes
                   Resource:
                     - !GetAtt NotificationQueue.Arn
+
+    UserDailyVitalsAggregationLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:service}-${self:provider.stage}-user-daily-vitals-aggregation-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: user-daily-vitals-aggregation-lambda-policy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: '*'
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                  Resource:
+                    - !Sub '${CaBundlesBucket.Arn}/*'
 
     TerraLambdaRole:
       Type: AWS::IAM::Role
