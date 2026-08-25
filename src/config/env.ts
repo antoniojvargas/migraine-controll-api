@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { cleanEnv, str, port } from 'envalid';
+import { cleanEnv, str, port, bool } from 'envalid';
 
 export const envs = cleanEnv(process.env, {
   NODE_ENV: str({
@@ -30,6 +30,12 @@ export const envs = cleanEnv(process.env, {
 
   TERRA_RAW_PAYLOADS_BUCKET: str({ default: '' }),
   CA_BUNDLES_BUCKET: str({ default: '' }),
+  CA_BUNDLE_KEY: str({ default: 'global-bundle.pem' }),
+
+  DOCUMENTDB_ENABLED: bool({ default: false }),
+  DOCUMENTDB_URI: str({ default: '' }),
+  DOCUMENTDB_DATABASE: str({ default: 'terra' }),
+  DOCUMENTDB_COLLECTION: str({ default: 'health_data' }),
 
   SENTRY_DSN: str({ default: '' }),
 });
