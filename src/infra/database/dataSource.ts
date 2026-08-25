@@ -24,6 +24,7 @@ import {
   UserEntity,
   UserResponseEntity,
   UserResponseAcuteTreatmentWorseFeedbackOptionsEntity,
+  WeatherTileEntity,
 } from '@/infra/database/entities';
 
 export const dataSource = new DataSource({
@@ -57,6 +58,7 @@ export const dataSource = new DataSource({
     UserEntity,
     UserResponseEntity,
     UserResponseAcuteTreatmentWorseFeedbackOptionsEntity,
+    WeatherTileEntity,
   ],
   migrations: ['src/infra/database/migrations/**/*.ts'],
   synchronize: false,

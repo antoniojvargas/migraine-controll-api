@@ -20,3 +20,4 @@ export { TranslationEntity } from './translation.entity';
 export { UserEntity } from './user.entity';
 export { UserResponseEntity } from './user-response.entity';
 export { UserResponseAcuteTreatmentWorseFeedbackOptionsEntity } from './user-response-acute-treatment-worse-feedback-options.entity';
+export { WeatherTileEntity } from './weather-tile.entity';
