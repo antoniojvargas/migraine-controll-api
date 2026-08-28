@@ -8,6 +8,9 @@ export const FORMS_CATEGORY_PREFIX = 'forms@';
 
 export const MIGRAINE_LOG_CATEGORY_PREFIX = 'migraine_log@';
 
+export const MIGRAINE_TRIGGERS_QUESTION_KEY = 'migraine_triggers';
+export const MIGRAINE_SYMPTOMS_QUESTION_KEY = 'migraine_symptoms';
+
 export const MAX_TRANSLATION_TEXT_LENGTH = 200;
 
 export const MAX_ANSWER_TEXT_LENGTH = 1000;
