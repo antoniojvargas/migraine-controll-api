@@ -1,8 +1,13 @@
 {
   "extension": [".ts"],
   "all": true,
-  "include": ["src/**/*.ts"],
+  "include": ["src/domain/**/*.ts", "src/usecase/**/*.ts"],
   "exclude": ["src/**/*.d.ts", "src/**/*.test.ts", "src/**/*.spec.ts"],
   "reporter": ["text", "lcov", "html"],
-  "report-dir": "coverage"
+  "report-dir": "coverage",
+  "check-coverage": true,
+  "statements": 80,
+  "branches": 80,
+  "functions": 80,
+  "lines": 80
 }
