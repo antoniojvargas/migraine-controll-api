@@ -11,6 +11,12 @@ module.exports = {
   },
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
   clearMocks: true,
+  collectCoverageFrom: [
+    'src/domain/**/*.ts',
+    'src/usecase/**/*.ts',
+    '!src/**/*.d.ts',
+    '!src/**/index.ts',
+  ],
   coverageThreshold: {
     './src/domain/': {
       statements: 80,
