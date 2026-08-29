@@ -1,7 +1,5 @@
 import { dataSource } from '@/infra/database/dataSource';
-import { ProfileEntity, UserEntity } from '@/infra/database/entities';
-import { UserRepository } from '@/infra/database/repository/user.repository';
-import { ProfileRepository } from '@/infra/database/repository/profile.repository';
+import { buildRepositories } from '@/factory/container';
 import { CognitoPostSignUpUc } from '@/usecase/cognito-post-sign-up.uc';
 import { PostConfirmationTriggerEvent } from './types';
 
@@ -28,11 +26,10 @@ export const handler = async (
   );
 
   await ensureDataSourceInitialized();
-  const userRepository = new UserRepository(dataSource.getRepository(UserEntity));
-  const profileRepository = new ProfileRepository(dataSource.getRepository(ProfileEntity));
+  const repos = buildRepositories(dataSource);
   const { userAttributes } = event.request;
 
-  await new CognitoPostSignUpUc(userRepository, profileRepository).execute({
+  await new CognitoPostSignUpUc(repos.user, repos.profile).execute({
     externalId: event.userName,
     email: userAttributes.email ?? '',
     name: userAttributes.name,

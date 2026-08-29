@@ -1,6 +1,5 @@
 import { dataSource } from '@/infra/database/dataSource';
-import { UserEntity } from '@/infra/database/entities';
-import { UserRepository } from '@/infra/database/repository/user.repository';
+import { buildRepositories } from '@/factory/container';
 import { CognitoSignUpUc } from '@/usecase/cognito-sign-up.uc';
 import { PreSignUpTriggerEvent } from './types';
 
@@ -21,8 +20,8 @@ export const handler = async (event: PreSignUpTriggerEvent): Promise<PreSignUpTr
   }
 
   await ensureDataSourceInitialized();
-  const userRepository = new UserRepository(dataSource.getRepository(UserEntity));
-  await new CognitoSignUpUc(userRepository).execute({ email });
+  const repos = buildRepositories(dataSource);
+  await new CognitoSignUpUc(repos.user).execute({ email });
 
   const isAdminCreatedUser = event.triggerSource === 'PreSignUp_AdminCreateUser';
   event.response.autoConfirmUser = isAdminCreatedUser;

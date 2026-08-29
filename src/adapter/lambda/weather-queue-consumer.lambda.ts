@@ -2,8 +2,7 @@ import '@/config/instrument';
 import { SQSBatchResponse, SQSEvent, SQSRecord } from 'aws-lambda';
 import * as Sentry from '@sentry/node';
 import { dataSource } from '@/infra/database/dataSource';
-import { WeatherTileEntity } from '@/infra/database/entities';
-import { WeatherTileRepository } from '@/infra/database/repository/weather-tile.repository';
+import { buildRepositories } from '@/factory/container';
 import { OpenMeteoWeatherProviderAdapter } from '@/infra/weather/open-meteo-weather-provider.adapter';
 import {
   IngestWeatherTileUc,
@@ -28,11 +27,9 @@ const ensureDataSourceInitialized = async (): Promise<void> => {
 export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
   await ensureDataSourceInitialized();
 
-  const weatherTileRepository = new WeatherTileRepository(
-    dataSource.getRepository(WeatherTileEntity),
-  );
+  const repos = buildRepositories(dataSource);
   const ingestWeatherTileUc = new IngestWeatherTileUc(
-    weatherTileRepository,
+    repos.weatherTile,
     new OpenMeteoWeatherProviderAdapter(),
   );
 

@@ -1,9 +1,7 @@
 import '@/config/instrument';
 import * as Sentry from '@sentry/node';
 import { dataSource } from '@/infra/database/dataSource';
-import { MigraineLogEntity, PushNotificationTokenEntity } from '@/infra/database/entities';
-import { MigraineLogRepository } from '@/infra/database/repository/migraine-log.repository';
-import { PushNotificationTokenRepository } from '@/infra/database/repository/push-notification-token.repository';
+import { buildRepositories } from '@/factory/container';
 import { SendWeeklyMigraineTrendAlertsUc } from '@/usecase/notification/send-weekly-migraine-trend-alerts.uc';
 import { logger } from '@/config/logger';
 
@@ -17,16 +15,11 @@ export const handler = async (): Promise<void> => {
   try {
     await ensureDataSourceInitialized();
 
-    const migraineLogRepository = new MigraineLogRepository(
-      dataSource.getRepository(MigraineLogEntity),
-    );
-    const pushNotificationTokenRepository = new PushNotificationTokenRepository(
-      dataSource.getRepository(PushNotificationTokenEntity),
-    );
+    const repos = buildRepositories(dataSource);
 
     const result = await new SendWeeklyMigraineTrendAlertsUc(
-      migraineLogRepository,
-      pushNotificationTokenRepository,
+      repos.migraineLog,
+      repos.pushNotificationToken,
     ).execute();
 
     logger.info(result, 'Weekly migraine trend alerts processed');
