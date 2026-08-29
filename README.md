@@ -129,6 +129,20 @@ Para desplegar con Serverless Framework, además de estas variables se necesitan
 documentadas en [`secrets.example.yml`](./secrets.example.yml) (mismo set, pensado para
 exportarse en el shell o inyectarse como secrets de CI en vez de vivir en `.env`).
 
+## Autenticación
+
+- Los endpoints `/users/:userId/*` (perfiles, `migraine-logs`,
+  `preventive-treatments`, `calendar-view`, `preferred-answers`) y `DELETE /users/me`
+  exigen `Authorization: Bearer <token>`. El `:userId` de la ruta debe coincidir con
+  el usuario del token (`401` sin token o token inválido, `403` si es de otro
+  usuario). `/health`, `/app-version`, `/acute-treatment-worse-feedback-options` y
+  `/terra/webhook` son públicas.
+- En producción el token es un access token de Cognito (`COGNITO_USER_POOL_ID`).
+- En local y en el contenedor e2e (`NODE_ENV !== 'production'`) no hay un user pool
+  real: `src/index.ts` usa `InsecureBearerSubVerifier`, que trata el Bearer como el
+  `externalId` del usuario. Así, para pegarle a la API local basta
+  `Authorization: Bearer <externalId>`.
+
 ## Scripts disponibles
 
 | Script                       | Descripción                                                    |

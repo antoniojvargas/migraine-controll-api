@@ -5,6 +5,29 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y este
 proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [Unreleased]
+
+### Changed
+
+- **BREAKING — autorización**: las rutas `/users/:userId/*` (perfiles,
+  `migraine-logs`, `preventive-treatments`, `calendar-view`, `preferred-answers`)
+  ahora exigen un `Authorization: Bearer <token>` válido cuyo usuario coincida con
+  `:userId`. Devuelven `401` sin token / token inválido y `403` si el token es de
+  otro usuario. Antes no tenían autenticación. `/app-version`,
+  `/acute-treatment-worse-feedback-options` y `/terra/webhook` siguen públicas.
+- La creación de log de migraña y de tratamiento preventivo se ejecuta dentro de
+  una transacción de base de datos: un fallo a mitad de la persistencia de
+  respuestas ya no deja filas huérfanas.
+
+### Refactor (sin cambio de comportamiento)
+
+- 24 repositorios colapsados en `BaseRepository<T>` (−732 LOC).
+- Punto único de ensamblado de repositorios (`factory/container.ts`), adoptado por
+  el factory HTTP, las Lambdas de cron/cola y los triggers de Cognito.
+- Mapeo de errores unificado en `utils/error-mapping.ts#classifyError`.
+- Pipeline de persistencia de respuestas + patrones de fecha/regex centralizados.
+- Ver `REFACTOR_RECOMMENDATIONS.md` para los hallazgos aún pendientes.
+
 ## [1.0.0] - 2026-08-28
 
 ### Added
