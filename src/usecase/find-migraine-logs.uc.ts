@@ -2,8 +2,7 @@ import { MigraineLogRepository } from '@/infra/database/repository/migraine-log.
 import { PreventiveTreatmentScheduleRepository } from '@/infra/database/repository/preventive-treatment-schedule.repository';
 import { FindMigraineLogsInputDto } from '@/dto/find-migraine-logs-input.dto';
 import { FindMigraineLogsOutputDto } from '@/dto/find-migraine-logs-output.dto';
-import { DomainError } from '@/domain/domain-error';
-import { requireDate, requireNonEmpty } from '@/domain/validation';
+import { parseDateRange, requireNonEmpty } from '@/domain/validation';
 import { toMigraineLogEntry } from '@/utils/migraine-log-mapper';
 import { buildWeeklyStatistics } from '@/utils/weekly-stats';
 import { handleErrorResponse } from '@/utils/handle-error-response';
@@ -27,12 +26,7 @@ export class FindMigraineLogsUc implements UseCaseInterface<
   execute = async (input: FindMigraineLogsInputDto): Promise<FindMigraineLogsOutputDto> => {
     try {
       const userId = requireNonEmpty(input.userId, 'userId');
-      const from =
-        input.from === undefined || input.from === null ? null : requireDate(input.from, 'from');
-      const to = input.to === undefined || input.to === null ? null : requireDate(input.to, 'to');
-      if (from !== null && to !== null && from.getTime() > to.getTime()) {
-        throw new DomainError('from must not be after to');
-      }
+      const { from, to } = parseDateRange(input);
 
       const logQuery = this.migraineLogRepository
         .createQueryBuilder('ml')

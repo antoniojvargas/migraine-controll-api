@@ -2,11 +2,9 @@ import Joi from 'joi';
 import { CreateProfileDto } from '@/dto/create-profile.dto';
 import { UpdateProfileInputDto } from '@/dto/update-profile-input.dto';
 import { LATITUDE_MAX, LATITUDE_MIN, LONGITUDE_MAX, LONGITUDE_MIN } from '@/domain/constants';
+import { GEOHASH6_PATTERN, LANGUAGE_PATTERN, SEMVER_PATTERN } from '@/domain/patterns';
 import { joiSchema } from './joi-schema';
 
-const SEMVER_PATTERN = /^\d+\.\d+\.\d+$/;
-const GEOHASH6_PATTERN = /^[0-9a-z]{6}$/i;
-const LANGUAGE_PATTERN = /^[a-z]{2,3}$/i;
 const GENDERS = ['f', 'm', 'nb'] as const;
 
 type CreateProfileBody = Omit<CreateProfileDto, 'userId'>;

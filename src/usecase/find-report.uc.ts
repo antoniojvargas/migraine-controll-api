@@ -3,9 +3,8 @@ import { NewUserResponseRepository } from '@/infra/database/repository/new-user-
 import { PreventiveTreatmentScheduleRepository } from '@/infra/database/repository/preventive-treatment-schedule.repository';
 import { FindReportInputDto } from '@/dto/find-report-input.dto';
 import { ReportOutputDto } from '@/dto/report-output.dto';
-import { DomainError } from '@/domain/domain-error';
 import { MIGRAINE_SYMPTOMS_QUESTION_KEY, MIGRAINE_TRIGGERS_QUESTION_KEY } from '@/domain/constants';
-import { requireDate, requireNonEmpty } from '@/domain/validation';
+import { parseDateRange, requireNonEmpty } from '@/domain/validation';
 import {
   buildDayOfWeekDistribution,
   buildDurationStats,
@@ -36,12 +35,7 @@ export class FindReportUc implements UseCaseInterface<FindReportInputDto, Report
   execute = async (input: FindReportInputDto): Promise<ReportOutputDto> => {
     try {
       const userId = requireNonEmpty(input.userId, 'userId');
-      const from =
-        input.from === undefined || input.from === null ? null : requireDate(input.from, 'from');
-      const to = input.to === undefined || input.to === null ? null : requireDate(input.to, 'to');
-      if (from !== null && to !== null && from.getTime() > to.getTime()) {
-        throw new DomainError('from must not be after to');
-      }
+      const { from, to } = parseDateRange(input);
 
       const logQuery = this.migraineLogRepository
         .createQueryBuilder('ml')

@@ -1,9 +1,10 @@
 import { DomainError } from './domain-error';
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const SEMVER_REGEX = /^\d+\.\d+\.\d+$/;
-const GEOHASH_REGEX = /^[0-9a-z]{6}$/i;
-const LANGUAGE_REGEX = /^[a-z]{2,3}$/i;
+import {
+  EMAIL_PATTERN as EMAIL_REGEX,
+  GEOHASH6_PATTERN as GEOHASH_REGEX,
+  LANGUAGE_PATTERN as LANGUAGE_REGEX,
+  SEMVER_PATTERN as SEMVER_REGEX,
+} from './patterns';
 
 export function requireNonEmpty(value: string, field: string): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
@@ -139,4 +140,26 @@ export function requireFutureDate(value: string | Date, field: string): Date {
     throw new DomainError(`${field} must be today or in the future`);
   }
   return date;
+}
+
+export interface DateRange {
+  from: Date | null;
+  to: Date | null;
+}
+
+/**
+ * Normaliza un rango `{ from?, to? }` (ISO string o Date) a `Date | null`,
+ * validando el formato de cada extremo y que `from` no sea posterior a `to`.
+ * Extraído de find-calendar-view / find-migraine-logs / find-report.
+ */
+export function parseDateRange(input: {
+  from?: string | Date | null;
+  to?: string | Date | null;
+}): DateRange {
+  const from = input.from == null ? null : requireDate(input.from, 'from');
+  const to = input.to == null ? null : requireDate(input.to, 'to');
+  if (from !== null && to !== null && from.getTime() > to.getTime()) {
+    throw new DomainError('from must not be after to');
+  }
+  return { from, to };
 }

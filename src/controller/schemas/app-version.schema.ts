@@ -1,8 +1,7 @@
 import Joi from 'joi';
 import { FindAppVersionInputDto } from '@/dto/find-app-version.dto';
+import { SEMVER_PATTERN } from '@/domain/patterns';
 import { joiSchema } from './joi-schema';
-
-const SEMVER_PATTERN = /^\d+\.\d+\.\d+$/;
 
 export const appVersionQuerySchema = joiSchema<FindAppVersionInputDto>(
   Joi.object({
