@@ -5,7 +5,10 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y este
 proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
-## [Unreleased]
+## [1.1.0] - 2026-08-29
+
+> Nota: la autorización de `/users/:userId/*` es un cambio incompatible para
+> clientes existentes (pasan de sin auth a `401`/`403`).
 
 ### Changed
 
@@ -67,4 +70,5 @@ proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   dependencia), `openapi.yml` (contrato de la API) y `SECURITY.md` (política de
   reporte de vulnerabilidades).
 
+[1.1.0]: https://github.com/antoniojvargas/migraine-controll-api/releases/tag/v1.1.0
 [1.0.0]: https://github.com/antoniojvargas/migraine-controll-api/releases/tag/v1.0.0
