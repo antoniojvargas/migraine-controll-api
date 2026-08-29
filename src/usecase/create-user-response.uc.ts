@@ -12,8 +12,10 @@ export class CreateUserResponseUc
   execute = async (input: CreateUserResponseInputDto): Promise<UserResponseOutputDto> => {
     try {
       const userId = requireNonEmpty(input.userId, 'userId');
-      const question = await this.loadQuestion(input.questionId);
+      const repos = this.defaultRepos;
+      const question = await this.loadQuestion(repos, input.questionId);
       const resolved = await this.resolveAnswer(
+        repos,
         question,
         input.answerId,
         input.answerText,

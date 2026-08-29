@@ -12,7 +12,7 @@ export class CreateUserResponsesUc
   execute = async (input: CreateUserResponsesInputDto): Promise<UserResponseOutputDto[]> => {
     try {
       const userId = requireNonEmpty(input.userId, 'userId');
-      const responses = await this.persistUserResponses({
+      const responses = await this.persistUserResponses(this.defaultRepos, {
         userId,
         items: input.responses,
         migraineLogId: input.migraineLogId,

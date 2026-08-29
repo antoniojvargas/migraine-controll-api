@@ -144,6 +144,7 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
           repos.selection,
           repos.translation,
           repos.pushNotificationToken,
+          dataSource,
         ),
       ),
     );
@@ -157,6 +158,7 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
           repos.question,
           repos.selection,
           repos.translation,
+          dataSource,
         ),
       ),
     );

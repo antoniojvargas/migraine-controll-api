@@ -1,4 +1,4 @@
-import { DeepPartial } from 'typeorm';
+import { DataSource, DeepPartial } from 'typeorm';
 import { MigraineLog } from '@/domain/migraine-log';
 import { MigraineLogRepository } from '@/infra/database/repository/migraine-log.repository';
 import { PreferredAnswersRepository } from '@/infra/database/repository/preferred-answers.repository';
@@ -30,6 +30,7 @@ export class CreateMigraineLogUc
     selectionRepository: SelectionRepository,
     translationRepository: TranslationRepository,
     pushNotificationTokenRepository: PushNotificationTokenRepository,
+    dataSource?: DataSource,
   ) {
     super(
       userResponseRepository,
@@ -37,6 +38,7 @@ export class CreateMigraineLogUc
       selectionRepository,
       translationRepository,
       preferredAnswersRepository,
+      dataSource,
     );
     this.migraineLogRepository = migraineLogRepository;
     this.pushNotificationTokenRepository = pushNotificationTokenRepository;
@@ -46,21 +48,35 @@ export class CreateMigraineLogUc
     try {
       const { responses = [], ...logDto } = input;
       const log = MigraineLog.createNewMigraineLog(logDto);
-      const persistedLog = await this.migraineLogRepository.create(this.mapLogToEntity(log));
-      log.assignId(persistedLog.id);
 
-      const domainResponses = await this.persistUserResponses({
-        userId: log.userId,
-        items: responses,
-        migraineLogId: persistedLog.id,
-        upsertPreferred: true,
+      // El log y sus respuestas se persisten en una sola transacción: un fallo a
+      // mitad del bucle de respuestas ya no deja un log huérfano.
+      const { persistedLogId, domainResponses } = await this.withTransaction(async (manager) => {
+        const migraineLogRepository =
+          manager === undefined
+            ? this.migraineLogRepository
+            : new MigraineLogRepository(manager.getRepository(MigraineLogEntity));
+        const repos = this.responseReposFor(manager);
+
+        const persistedLog = await migraineLogRepository.create(this.mapLogToEntity(log));
+        log.assignId(persistedLog.id);
+
+        const responsesOut = await this.persistUserResponses(repos, {
+          userId: log.userId,
+          items: responses,
+          migraineLogId: persistedLog.id,
+          upsertPreferred: true,
+        });
+
+        return { persistedLogId: persistedLog.id, domainResponses: responsesOut };
       });
 
+      // Fuera de la transacción: lee datos ya committeados y encola notificaciones.
       const recurrentSymptoms = await this.detectRecurrentSymptoms(log.userId);
       await this.onRecurrentSymptomsDetected(recurrentSymptoms, log.userId);
 
       return {
-        id: persistedLog.id,
+        id: persistedLogId,
         userId: log.userId,
         sessionId: log.sessionId,
         intensity: log.intensity,

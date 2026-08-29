@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { DeepPartial } from 'typeorm';
+import { DataSource, DeepPartial, EntityManager } from 'typeorm';
 import { UserResponse } from '@/domain/user-response';
 import { Question } from '@/domain/question';
 import { Selection } from '@/domain/selection';
@@ -12,13 +12,32 @@ import { QuestionRepository } from '@/infra/database/repository/question.reposit
 import { SelectionRepository } from '@/infra/database/repository/selection.repository';
 import { TranslationRepository } from '@/infra/database/repository/translation.repository';
 import { PreferredAnswersRepository } from '@/infra/database/repository/preferred-answers.repository';
-import { UserResponseEntity, SelectionEntity, TranslationEntity } from '@/infra/database/entities';
+import {
+  UserResponseEntity,
+  SelectionEntity,
+  TranslationEntity,
+  QuestionEntity,
+  PreferredAnswersEntity,
+} from '@/infra/database/entities';
 import { UserResponseOutputDto } from '@/dto/user-response-output.dto';
 import { AppError } from '@/utils/app-error';
 
 export interface ResolvedAnswer {
   selectionId: string | null;
   answerText: string | null;
+}
+
+/**
+ * Conjunto de repositorios que necesita el pipeline de respuestas. En el camino
+ * normal son los inyectados por constructor; dentro de una transacción son
+ * instancias ligadas al `EntityManager` de esa transacción.
+ */
+export interface UserResponseRepos {
+  userResponse: UserResponseRepository;
+  question: QuestionRepository;
+  selection: SelectionRepository;
+  translation: TranslationRepository;
+  preferredAnswers?: PreferredAnswersRepository;
 }
 
 export interface PersistUserResponsesInput {
@@ -42,9 +61,60 @@ export abstract class UserResponseBaseUc {
     protected readonly selectionRepository: SelectionRepository,
     protected readonly translationRepository: TranslationRepository,
     protected readonly preferredAnswersRepository?: PreferredAnswersRepository,
+    /**
+     * Opcional. Si se provee, `withTransaction` ejecuta el trabajo dentro de una
+     * transacción real y `responseReposFor` devuelve repos ligados al manager.
+     * Si se omite (solo en tests unitarios), el trabajo corre sin transacción
+     * sobre los repos inyectados. En `build-app.ts` siempre se provee.
+     */
+    protected readonly dataSource?: DataSource,
   ) {}
 
+  /** Repositorios inyectados por constructor, empaquetados. */
+  protected get defaultRepos(): UserResponseRepos {
+    return {
+      userResponse: this.userResponseRepository,
+      question: this.questionRepository,
+      selection: this.selectionRepository,
+      translation: this.translationRepository,
+      preferredAnswers: this.preferredAnswersRepository,
+    };
+  }
+
+  /** Repositorios del pipeline de respuestas ligados a un `EntityManager`. */
+  protected buildResponseRepos(manager: EntityManager): UserResponseRepos {
+    return {
+      userResponse: new UserResponseRepository(manager.getRepository(UserResponseEntity)),
+      question: new QuestionRepository(manager.getRepository(QuestionEntity)),
+      selection: new SelectionRepository(manager.getRepository(SelectionEntity)),
+      translation: new TranslationRepository(manager.getRepository(TranslationEntity)),
+      preferredAnswers:
+        this.preferredAnswersRepository === undefined
+          ? undefined
+          : new PreferredAnswersRepository(manager.getRepository(PreferredAnswersEntity)),
+    };
+  }
+
+  /**
+   * Ejecuta `work` dentro de una transacción si hay `dataSource`; si no, la
+   * ejecuta directamente (`manager === undefined`). Los casos de uso deciden qué
+   * repos usar según reciban o no un `manager` (ver `responseReposFor`).
+   */
+  protected async withTransaction<R>(
+    work: (manager: EntityManager | undefined) => Promise<R>,
+  ): Promise<R> {
+    if (this.dataSource === undefined) {
+      return work(undefined);
+    }
+    return this.dataSource.transaction((manager) => work(manager));
+  }
+
+  protected responseReposFor(manager: EntityManager | undefined): UserResponseRepos {
+    return manager === undefined ? this.defaultRepos : this.buildResponseRepos(manager);
+  }
+
   protected async loadQuestion(
+    repos: UserResponseRepos,
     questionId: string,
     cache?: Map<string, Question>,
   ): Promise<Question> {
@@ -53,7 +123,7 @@ export abstract class UserResponseBaseUc {
     if (cached !== undefined) {
       return cached;
     }
-    const entity = await this.questionRepository.findOneBy({ id });
+    const entity = await repos.question.findOneBy({ id });
     if (entity === null) {
       throw new AppError(404, 'QUESTION_NOT_FOUND', 'Question not found');
     }
@@ -68,6 +138,7 @@ export abstract class UserResponseBaseUc {
   }
 
   protected async resolveAnswer(
+    repos: UserResponseRepos,
     question: Question,
     answerId: string | null | undefined,
     answerText: string | null | undefined,
@@ -91,6 +162,7 @@ export abstract class UserResponseBaseUc {
     }
     if (hasAnswerText) {
       const selectionId = await this.createCustomSelection(
+        repos,
         question,
         answerText as string,
         answerLanguageCode,
@@ -150,7 +222,10 @@ export abstract class UserResponseBaseUc {
    * loadQuestion → resolveAnswer → buildUserResponse → bulkCreate → assignId
    * que estaba duplicado en tres casos de uso.
    */
-  protected async persistUserResponses(input: PersistUserResponsesInput): Promise<UserResponse[]> {
+  protected async persistUserResponses(
+    repos: UserResponseRepos,
+    input: PersistUserResponsesInput,
+  ): Promise<UserResponse[]> {
     const {
       userId,
       items,
@@ -164,8 +239,9 @@ export abstract class UserResponseBaseUc {
     const entities: DeepPartial<UserResponseEntity>[] = [];
 
     for (const item of items) {
-      const question = await this.loadQuestion(item.questionId, questionCache);
+      const question = await this.loadQuestion(repos, item.questionId, questionCache);
       const resolved = await this.resolveAnswer(
+        repos,
         question,
         item.answerId,
         item.answerText,
@@ -181,11 +257,11 @@ export abstract class UserResponseBaseUc {
       domainResponses.push(response);
       entities.push(this.mapUserResponseToEntity(response));
       if (upsertPreferred) {
-        await this.upsertPreferredAnswerIfAbsent(userId, question.id as string, resolved);
+        await this.upsertPreferredAnswerIfAbsent(repos, userId, question.id as string, resolved);
       }
     }
 
-    const persisted = await this.userResponseRepository.bulkCreate(entities);
+    const persisted = await repos.userResponse.bulkCreate(entities);
     persisted.forEach((entity, index) => domainResponses[index].assignId(entity.id));
     return domainResponses;
   }
@@ -196,21 +272,22 @@ export abstract class UserResponseBaseUc {
    * `preferredAnswersRepository`.
    */
   protected async upsertPreferredAnswerIfAbsent(
+    repos: UserResponseRepos,
     userId: string,
     questionId: string,
     resolved: ResolvedAnswer,
   ): Promise<void> {
-    if (this.preferredAnswersRepository === undefined) {
+    if (repos.preferredAnswers === undefined) {
       throw new Error('preferredAnswersRepository is required to upsert preferred answers');
     }
-    const existing = await this.preferredAnswersRepository.findOneBy({
+    const existing = await repos.preferredAnswers.findOneBy({
       user: { id: userId },
       question: { id: questionId },
     });
     if (existing !== null) {
       return;
     }
-    await this.preferredAnswersRepository.create({
+    await repos.preferredAnswers.create({
       user: { id: userId },
       question: { id: questionId },
       selection: resolved.selectionId !== null ? { id: resolved.selectionId } : undefined,
@@ -219,6 +296,7 @@ export abstract class UserResponseBaseUc {
   }
 
   private async createCustomSelection(
+    repos: UserResponseRepos,
     question: Question,
     text: string,
     answerLanguageCode: string | undefined,
@@ -228,15 +306,13 @@ export abstract class UserResponseBaseUc {
     }
     const languageCode = requireSupportedLanguage(answerLanguageCode, SUPPORTED_LANGUAGES);
 
-    const order = await this.nextSelectionOrder(question.id as string);
+    const order = await this.nextSelectionOrder(repos, question.id as string);
     const selection = Selection.createNewSelection({
       question,
       key: `other-${randomUUID()}`,
       order,
     });
-    const persistedSelection = await this.selectionRepository.create(
-      this.mapSelectionToEntity(selection),
-    );
+    const persistedSelection = await repos.selection.create(this.mapSelectionToEntity(selection));
     selection.assignId(persistedSelection.id);
 
     const translation = Translation.createNewTranslation({
@@ -244,13 +320,13 @@ export abstract class UserResponseBaseUc {
       languageCode,
       text,
     });
-    await this.translationRepository.create(this.mapTranslationToEntity(translation));
+    await repos.translation.create(this.mapTranslationToEntity(translation));
 
     return selection.id as string;
   }
 
-  private async nextSelectionOrder(questionId: string): Promise<number> {
-    const selections = await this.selectionRepository.findAllBy({ question: { id: questionId } });
+  private async nextSelectionOrder(repos: UserResponseRepos, questionId: string): Promise<number> {
+    const selections = await repos.selection.findAllBy({ question: { id: questionId } });
     return selections.reduce((max, selection) => Math.max(max, selection.order), -1) + 1;
   }
 

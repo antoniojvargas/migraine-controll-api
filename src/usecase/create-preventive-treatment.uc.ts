@@ -1,4 +1,4 @@
-import { DeepPartial } from 'typeorm';
+import { DataSource, DeepPartial } from 'typeorm';
 import { PreventiveTreatment } from '@/domain/preventive-treatment';
 import { PreventiveTreatmentRepository } from '@/infra/database/repository/preventive-treatment.repository';
 import { PreferredAnswersRepository } from '@/infra/database/repository/preferred-answers.repository';
@@ -26,6 +26,7 @@ export class CreatePreventiveTreatmentUc
     questionRepository: QuestionRepository,
     selectionRepository: SelectionRepository,
     translationRepository: TranslationRepository,
+    dataSource?: DataSource,
   ) {
     super(
       userResponseRepository,
@@ -33,6 +34,7 @@ export class CreatePreventiveTreatmentUc
       selectionRepository,
       translationRepository,
       preferredAnswersRepository,
+      dataSource,
     );
     this.preventiveTreatmentRepository = preventiveTreatmentRepository;
   }
@@ -43,20 +45,32 @@ export class CreatePreventiveTreatmentUc
     try {
       const { responses = [], ...treatmentDto } = input;
       const treatment = PreventiveTreatment.createNewPreventiveTreatment(treatmentDto);
-      const persistedTreatment = await this.preventiveTreatmentRepository.create(
-        this.mapTreatmentToEntity(treatment),
-      );
-      treatment.assignId(persistedTreatment.id);
 
-      const domainResponses = await this.persistUserResponses({
-        userId: treatment.userId,
-        items: responses,
-        preventiveTreatmentId: persistedTreatment.id,
-        upsertPreferred: true,
+      // El tratamiento y sus respuestas se persisten en una sola transacción.
+      const { treatmentId, domainResponses } = await this.withTransaction(async (manager) => {
+        const preventiveTreatmentRepository =
+          manager === undefined
+            ? this.preventiveTreatmentRepository
+            : new PreventiveTreatmentRepository(manager.getRepository(PreventiveTreatmentEntity));
+        const repos = this.responseReposFor(manager);
+
+        const persistedTreatment = await preventiveTreatmentRepository.create(
+          this.mapTreatmentToEntity(treatment),
+        );
+        treatment.assignId(persistedTreatment.id);
+
+        const responsesOut = await this.persistUserResponses(repos, {
+          userId: treatment.userId,
+          items: responses,
+          preventiveTreatmentId: persistedTreatment.id,
+          upsertPreferred: true,
+        });
+
+        return { treatmentId: persistedTreatment.id, domainResponses: responsesOut };
       });
 
       return {
-        id: persistedTreatment.id,
+        id: treatmentId,
         userId: treatment.userId,
         name: treatment.name,
         isRecurrent: treatment.isRecurrent,
