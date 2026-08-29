@@ -80,8 +80,9 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
         geohash6: 'dzn6c6',
       });
 
+      // El schema Joi de la capa HTTP rechaza el formato antes de que llegue al dominio.
       expect(response.status).toBe(400);
-      expect(response.body).toMatchObject({ code: 'DOMAIN_VALIDATION_ERROR' });
+      expect(response.body).toMatchObject({ code: 'VALIDATION_ERROR' });
     });
   });
 

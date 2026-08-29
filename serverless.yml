@@ -242,9 +242,12 @@ resources:
                     - cognito-idp:AdminDeleteUser
                     - cognito-idp:AdminUpdateUserAttributes
                     - cognito-idp:ListUsers
+                  # Sin fallback a "*": si COGNITO_USER_POOL_ID/COGNITO_LEGACY_USER_POOL_ID
+                  # no están seteados, el deploy falla en vez de conceder acceso a
+                  # cualquier user pool de la cuenta.
                   Resource:
-                    - !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${env:COGNITO_USER_POOL_ID, "*"}'
-                    - !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${env:COGNITO_LEGACY_USER_POOL_ID, "*"}'
+                    - !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${env:COGNITO_USER_POOL_ID}'
+                    - !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${env:COGNITO_LEGACY_USER_POOL_ID}'
 
     ProfilesLambdaRole:
       Type: AWS::IAM::Role
@@ -272,8 +275,8 @@ resources:
                   Action:
                     - cognito-idp:AdminUpdateUserAttributes
                   Resource:
-                    - !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${env:COGNITO_USER_POOL_ID, "*"}'
-                    - !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${env:COGNITO_LEGACY_USER_POOL_ID, "*"}'
+                    - !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${env:COGNITO_USER_POOL_ID}'
+                    - !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${env:COGNITO_LEGACY_USER_POOL_ID}'
 
     SessionsLambdaRole:
       Type: AWS::IAM::Role

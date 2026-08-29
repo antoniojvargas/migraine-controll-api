@@ -1,49 +1,9 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { executeController, RequestSchema, validateRequest } from '@/controller/utils';
-import { AppError } from '@/utils/app-error';
+import { executeController, validateRequest } from '@/controller/utils';
 import { UpsertPreferredAnswerUc } from '@/usecase/upsert-preferred-answer.uc';
 import { FindPreferredAnswersByUserUc } from '@/usecase/find-preferred-answers-by-user.uc';
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-interface PreferredAnswerBody {
-  selectionId?: string;
-  answerText?: string;
-}
-
-const preferredAnswerBodySchema: RequestSchema<PreferredAnswerBody> = {
-  validate(data: unknown) {
-    const body = (data ?? {}) as Record<string, unknown>;
-    if (
-      body.selectionId === undefined &&
-      (body.answerText === undefined || typeof body.answerText !== 'string')
-    ) {
-      return {
-        value: {},
-        error: { message: 'answerText is required when selectionId is not provided' },
-      };
-    }
-    if (
-      body.selectionId !== undefined &&
-      (typeof body.selectionId !== 'string' || UUID_REGEX.test(body.selectionId) === false)
-    ) {
-      return { value: {}, error: { message: 'selectionId must be a valid uuid' } };
-    }
-    return {
-      value: {
-        selectionId: body.selectionId as string | undefined,
-        answerText: body.answerText as string | undefined,
-      },
-    };
-  },
-};
-
-const requireUuidParam = (value: string | undefined, field: string): string => {
-  if (value === undefined || UUID_REGEX.test(value) === false) {
-    throw new AppError(400, 'VALIDATION_ERROR', `${field} must be a valid uuid`);
-  }
-  return value;
-};
+import { uuidParamSchema, uuidParamsSchema } from '@/controller/schemas/common.schema';
+import { preferredAnswerBodySchema } from '@/controller/schemas/preferred-answers.schema';
 
 export class PreferredAnswersController {
   constructor(
@@ -56,7 +16,7 @@ export class PreferredAnswersController {
     reply: FastifyReply,
   ): Promise<FastifyReply> =>
     executeController(reply, async () => {
-      const userId = requireUuidParam(request.params.userId, 'userId');
+      const { userId } = validateRequest(uuidParamSchema('userId'), request.params);
       const data = await this.findPreferredAnswersByUserUc.execute({ userId });
       return { data };
     });
@@ -66,8 +26,10 @@ export class PreferredAnswersController {
     reply: FastifyReply,
   ): Promise<FastifyReply> =>
     executeController(reply, async () => {
-      const userId = requireUuidParam(request.params.userId, 'userId');
-      const questionId = requireUuidParam(request.params.questionId, 'questionId');
+      const { userId, questionId } = validateRequest(
+        uuidParamsSchema(['userId', 'questionId']),
+        request.params,
+      );
       const body = validateRequest(preferredAnswerBodySchema, request.body);
       const data = await this.upsertPreferredAnswerUc.execute({ userId, questionId, ...body });
       return { statusCode: existingOrCreated(request), data };

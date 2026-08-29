@@ -1,9 +1,14 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { executeController } from '@/controller/utils';
+import { executeController, validateRequest } from '@/controller/utils';
 import { CreateProfileUc } from '@/usecase/create-profile.uc';
 import { UpdateProfileUc } from '@/usecase/update-profile.uc';
 import { CreateProfileDto } from '@/dto/create-profile.dto';
 import { UpdateProfileInputDto } from '@/dto/update-profile-input.dto';
+import { uuidParamSchema } from '@/controller/schemas/common.schema';
+import {
+  createProfileBodySchema,
+  updateProfileBodySchema,
+} from '@/controller/schemas/profile.schema';
 
 export class ProfileController {
   constructor(
@@ -16,10 +21,9 @@ export class ProfileController {
     reply: FastifyReply,
   ): Promise<FastifyReply> =>
     executeController(reply, async () => {
-      const data = await this.createProfileUc.execute({
-        ...request.body,
-        userId: request.params.userId,
-      });
+      const { userId } = validateRequest(uuidParamSchema('userId'), request.params);
+      const body = validateRequest(createProfileBodySchema, request.body);
+      const data = await this.createProfileUc.execute({ ...body, userId });
       return { statusCode: 201, data };
     });
 
@@ -31,10 +35,9 @@ export class ProfileController {
     reply: FastifyReply,
   ): Promise<FastifyReply> =>
     executeController(reply, async () => {
-      const data = await this.updateProfileUc.execute({
-        ...request.body,
-        userId: request.params.userId,
-      });
+      const { userId } = validateRequest(uuidParamSchema('userId'), request.params);
+      const body = validateRequest(updateProfileBodySchema, request.body);
+      const data = await this.updateProfileUc.execute({ ...body, userId });
       return { statusCode: 200, data };
     });
 }

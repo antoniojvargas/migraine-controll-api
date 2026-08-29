@@ -1,6 +1,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { executeController } from '@/controller/utils';
+import { executeController, validateRequest } from '@/controller/utils';
 import { FindCalendarViewUc } from '@/usecase/find-calendar-view.uc';
+import { uuidParamSchema } from '@/controller/schemas/common.schema';
+import { calendarViewQuerySchema } from '@/controller/schemas/calendar-view.schema';
 
 interface CalendarViewQuery {
   from?: string;
@@ -16,11 +18,13 @@ export class CalendarViewController {
     reply: FastifyReply,
   ): Promise<FastifyReply> =>
     executeController(reply, async () => {
+      const { userId } = validateRequest(uuidParamSchema('userId'), request.params);
+      const query = validateRequest(calendarViewQuerySchema, request.query);
       const data = await this.findCalendarViewUc.execute({
-        userId: request.params.userId,
-        from: request.query.from,
-        to: request.query.to,
-        timezone: request.query.timezone,
+        userId,
+        from: query.from,
+        to: query.to,
+        timezone: query.timezone,
       });
       return { data };
     });

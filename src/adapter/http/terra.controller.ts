@@ -1,7 +1,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { executeController } from '@/controller/utils';
+import { executeController, validateRequest } from '@/controller/utils';
 import { ProcessTerraWebhookUc } from '@/usecase/terra/process-terra-webhook.uc';
 import { TerraWebhookPayloadDto } from '@/dto/terra-webhook-payload.dto';
+import { terraWebhookBodySchema } from '@/controller/schemas/terra.schema';
 
 export class TerraController {
   constructor(private readonly processTerraWebhookUc: ProcessTerraWebhookUc) {}
@@ -11,7 +12,8 @@ export class TerraController {
     reply: FastifyReply,
   ): Promise<FastifyReply> =>
     executeController(reply, async () => {
-      const data = await this.processTerraWebhookUc.execute(request.body);
+      const body = validateRequest(terraWebhookBodySchema, request.body);
+      const data = await this.processTerraWebhookUc.execute(body);
       return { data };
     });
 }
