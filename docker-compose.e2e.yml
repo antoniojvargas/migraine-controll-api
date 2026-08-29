@@ -1,0 +1,81 @@
+name: migraine-controll-api-e2e
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: e2e
+      POSTGRES_PASSWORD: e2e
+      POSTGRES_DB: e2e
+    ports:
+      - '5436:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U e2e -d e2e']
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  mongo:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    ports:
+      - '27019:27017'
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping')"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  # Sustituto local de SQS para poder verificar la notificación encolada de punta a punta
+  localstack:
+    image: localstack/localstack:3
+    environment:
+      SERVICES: sqs
+      DEFAULT_REGION: us-east-1
+    ports:
+      - '4566:4566'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:4566/_localstack/health']
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  # Usa el stage "runtime" del Dockerfile (imagen tal cual se despliega en producción).
+  # Las migraciones NO se corren dentro del contenedor: test/e2e/global-setup.ts las
+  # corre desde el host contra el mismo Postgres (igual que test/integration/helpers.ts)
+  # antes de esperar a que la API responda /health. Correrlas aquí requeriría el stage
+  # "build" (que sí trae src/ + ts-node), pero entonces dataSource.initialize() intenta
+  # requerir los .ts de migraciones sin ts-node registrado (dist/index.js corre con node
+  # a secas) y el loader de módulos de Node termina el proceso con código 1 al intentar
+  # un import() ESM sobre el .ts. El stage "runtime" no tiene src/, así que ese glob no
+  # matchea nada y el problema no se presenta.
+  api:
+    build:
+      context: .
+      target: runtime
+    ports:
+      - '3100:3000'
+    environment:
+      NODE_ENV: test
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: e2e
+      DB_PASSWORD: e2e
+      DB_NAME: e2e
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_ENDPOINT_URL_SQS: http://localstack:4566
+      NOTIFICATION_QUEUE_URL: http://localstack:4566/000000000000/e2e-notifications
+      JWT_SECRET: e2e-secret
+      COGNITO_USER_POOL_ID: us-east-1_e2etest01
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
