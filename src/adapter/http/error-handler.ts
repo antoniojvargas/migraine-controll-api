@@ -1,12 +1,7 @@
-import { AppError } from '@/utils/app-error';
-import { DomainError } from '@/domain/domain-error';
 import { FastifyInstance } from 'fastify';
+import { classifyError, ErrorPayload } from '@/utils/error-mapping';
 
-export interface ErrorPayload {
-  statusCode: number;
-  code: string;
-  message: string;
-}
+export type { ErrorPayload };
 
 interface FastifyLikeError {
   statusCode?: number;
@@ -15,11 +10,9 @@ interface FastifyLikeError {
 }
 
 export const toErrorPayload = (error: unknown): ErrorPayload => {
-  if (error instanceof AppError) {
-    return { statusCode: error.statusCode, code: error.code, message: error.message };
-  }
-  if (error instanceof DomainError) {
-    return { statusCode: 400, code: 'DOMAIN_VALIDATION_ERROR', message: error.message };
+  const classified = classifyError(error);
+  if (classified !== null) {
+    return classified;
   }
   const candidate = error as FastifyLikeError | undefined;
   const statusCode =

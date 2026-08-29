@@ -1,26 +1,18 @@
-import { DomainError } from '@/domain/domain-error';
 import { AppError } from './app-error';
+import { classifyError } from './error-mapping';
 
+/**
+ * Traduce cualquier error lanzado a un `AppError`. Se usa en los bordes de capa
+ * (controllers y casos de uso). Los errores no reconocidos se ocultan tras un
+ * 500 genérico para no filtrar detalles internos.
+ */
 export function handleErrorResponse(error: unknown): never {
   if (error instanceof AppError) {
     throw error;
   }
-  if (error instanceof DomainError) {
-    throw new AppError(400, 'DOMAIN_VALIDATION_ERROR', error.message);
-  }
-  const code = getDatabaseErrorCode(error);
-  if (code === '23505') {
-    throw new AppError(409, 'CONFLICT', 'Resource already exists');
-  }
-  if (code === '23503') {
-    throw new AppError(400, 'INVALID_REFERENCE', 'Referenced resource does not exist');
+  const classified = classifyError(error);
+  if (classified !== null) {
+    throw new AppError(classified.statusCode, classified.code, classified.message);
   }
   throw new AppError(500, 'INTERNAL_ERROR', 'Internal server error');
-}
-
-function getDatabaseErrorCode(error: unknown): string | null {
-  if (typeof error === 'object' && error !== null && 'code' in error) {
-    return (error as { code?: unknown }).code as string | null;
-  }
-  return null;
 }
