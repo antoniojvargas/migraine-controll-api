@@ -1,14 +1,8 @@
-import { DeepPartial, FindOptionsWhere, Repository, SelectQueryBuilder } from 'typeorm';
+import { DeepPartial, FindOptionsWhere } from 'typeorm';
 import { NewUserResponseEntity } from '@/infra/database/entities';
-import { RepositoryInterface } from './repository.interface';
+import { BaseRepository } from './base.repository';
 
-export class NewUserResponseRepository implements RepositoryInterface<NewUserResponseEntity> {
-  constructor(private readonly repository: Repository<NewUserResponseEntity>) {}
-
-  async create(data: DeepPartial<NewUserResponseEntity>): Promise<NewUserResponseEntity> {
-    return this.repository.save(this.repository.create(data));
-  }
-
+export class NewUserResponseRepository extends BaseRepository<NewUserResponseEntity> {
   async bulkCreate(data: DeepPartial<NewUserResponseEntity>[]): Promise<NewUserResponseEntity[]> {
     return this.repository.save(this.repository.create(data));
   }
@@ -17,28 +11,5 @@ export class NewUserResponseRepository implements RepositoryInterface<NewUserRes
     criteria: FindOptionsWhere<NewUserResponseEntity> | FindOptionsWhere<NewUserResponseEntity>[],
   ): Promise<void> {
     await this.repository.delete(criteria);
-  }
-
-  findOneBy(
-    criteria: FindOptionsWhere<NewUserResponseEntity> | FindOptionsWhere<NewUserResponseEntity>[],
-  ): Promise<NewUserResponseEntity | null> {
-    return this.repository.findOneBy(criteria);
-  }
-
-  findAllBy(
-    criteria: FindOptionsWhere<NewUserResponseEntity> | FindOptionsWhere<NewUserResponseEntity>[],
-  ): Promise<NewUserResponseEntity[]> {
-    return this.repository.findBy(criteria);
-  }
-
-  async update(
-    criteria: FindOptionsWhere<NewUserResponseEntity>,
-    data: DeepPartial<NewUserResponseEntity>,
-  ): Promise<void> {
-    await this.repository.update(criteria, data);
-  }
-
-  createQueryBuilder(alias: string): SelectQueryBuilder<NewUserResponseEntity> {
-    return this.repository.createQueryBuilder(alias);
   }
 }

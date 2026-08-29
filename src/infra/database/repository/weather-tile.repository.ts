@@ -1,40 +1,10 @@
-import { DeepPartial, FindOptionsWhere, Repository, SelectQueryBuilder } from 'typeorm';
 import { WeatherTileEntity } from '@/infra/database/entities';
-import { RepositoryInterface } from './repository.interface';
+import { BaseRepository } from './base.repository';
 
 const HISTORY_BACKFILL_THRESHOLD_HOURS = 24;
 const FORECAST_UPDATE_THRESHOLD_HOURS = 6;
 
-export class WeatherTileRepository implements RepositoryInterface<WeatherTileEntity> {
-  constructor(private readonly repository: Repository<WeatherTileEntity>) {}
-
-  async create(data: DeepPartial<WeatherTileEntity>): Promise<WeatherTileEntity> {
-    return this.repository.save(this.repository.create(data));
-  }
-
-  findOneBy(
-    criteria: FindOptionsWhere<WeatherTileEntity> | FindOptionsWhere<WeatherTileEntity>[],
-  ): Promise<WeatherTileEntity | null> {
-    return this.repository.findOneBy(criteria);
-  }
-
-  findAllBy(
-    criteria: FindOptionsWhere<WeatherTileEntity> | FindOptionsWhere<WeatherTileEntity>[],
-  ): Promise<WeatherTileEntity[]> {
-    return this.repository.findBy(criteria);
-  }
-
-  async update(
-    criteria: FindOptionsWhere<WeatherTileEntity>,
-    data: DeepPartial<WeatherTileEntity>,
-  ): Promise<void> {
-    await this.repository.update(criteria, data);
-  }
-
-  createQueryBuilder(alias: string): SelectQueryBuilder<WeatherTileEntity> {
-    return this.repository.createQueryBuilder(alias);
-  }
-
+export class WeatherTileRepository extends BaseRepository<WeatherTileEntity> {
   async findOrCreate(geohash6: string): Promise<WeatherTileEntity> {
     const existing = await this.repository.findOneBy({ geohash6 });
     if (existing !== null) {
