@@ -27,5 +27,9 @@ export const registerMigraineLogRoutes = (
   app: FastifyInstance,
   controller: MigraineLogController,
 ): void => {
-  app.post('/users/:userId/migraine-logs', controller.create);
+  app.post<{ Params: { userId: string }; Body: Omit<CreateMigraineLogInputDto, 'userId'> }>(
+    '/users/:userId/migraine-logs',
+    { onRequest: [app.authenticateOwner] },
+    controller.create,
+  );
 };

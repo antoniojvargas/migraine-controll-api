@@ -34,5 +34,9 @@ export const registerCalendarViewRoutes = (
   app: FastifyInstance,
   controller: CalendarViewController,
 ): void => {
-  app.get('/users/:userId/calendar-view', controller.find);
+  app.get<{ Params: { userId: string }; Querystring: CalendarViewQuery }>(
+    '/users/:userId/calendar-view',
+    { onRequest: [app.authenticateOwner] },
+    controller.find,
+  );
 };

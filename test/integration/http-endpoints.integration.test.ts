@@ -48,17 +48,48 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
     return dataSource.getRepository(UserEntity).save({ email, externalId: `ext-${email}` });
   }
 
+  // El verifier mock devuelve { sub: token }; authenticateOwner resuelve el
+  // usuario por externalId y exige que coincida con :userId de la ruta.
+  const auth = (user: UserEntity): { Authorization: string } => ({
+    Authorization: `Bearer ${user.externalId}`,
+  });
+
+  describe('ownership guard on /users/:userId/*', () => {
+    it('returns 401 without an Authorization header', async () => {
+      const user = await createUser('guard-anon@test.com');
+
+      const response = await request(app.server).get(`/users/${user.id}/calendar-view`);
+
+      expect(response.status).toBe(401);
+    });
+
+    it('returns 403 when the token belongs to another user', async () => {
+      const owner = await createUser('guard-owner@test.com');
+      const intruder = await createUser('guard-intruder@test.com');
+
+      const response = await request(app.server)
+        .get(`/users/${owner.id}/calendar-view`)
+        .set(auth(intruder));
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({ code: 'FORBIDDEN' });
+    });
+  });
+
   describe('POST /users/:userId/profiles', () => {
     it('creates a profile for the user', async () => {
       const user = await createUser('profiles-a@test.com');
 
-      const response = await request(app.server).post(`/users/${user.id}/profiles`).send({
-        name: 'Ana',
-        gender: 'f',
-        birthDate: '1990-05-10',
-        language: 'es',
-        geohash6: 'dzn6c6',
-      });
+      const response = await request(app.server)
+        .post(`/users/${user.id}/profiles`)
+        .set(auth(user))
+        .send({
+          name: 'Ana',
+          gender: 'f',
+          birthDate: '1990-05-10',
+          language: 'es',
+          geohash6: 'dzn6c6',
+        });
 
       expect(response.status).toBe(201);
       expect(response.body).toMatchObject({
@@ -72,13 +103,16 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
     it('rejects an invalid language', async () => {
       const user = await createUser('profiles-b@test.com');
 
-      const response = await request(app.server).post(`/users/${user.id}/profiles`).send({
-        name: 'Ana',
-        gender: 'f',
-        birthDate: '1990-05-10',
-        language: '123',
-        geohash6: 'dzn6c6',
-      });
+      const response = await request(app.server)
+        .post(`/users/${user.id}/profiles`)
+        .set(auth(user))
+        .send({
+          name: 'Ana',
+          gender: 'f',
+          birthDate: '1990-05-10',
+          language: '123',
+          geohash6: 'dzn6c6',
+        });
 
       // El schema Joi de la capa HTTP rechaza el formato antes de que llegue al dominio.
       expect(response.status).toBe(400);
@@ -89,7 +123,7 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
   describe('PATCH /users/:userId/profiles', () => {
     it('updates the profile and syncs changed attributes to Cognito', async () => {
       const user = await createUser('profiles-c@test.com');
-      await request(app.server).post(`/users/${user.id}/profiles`).send({
+      await request(app.server).post(`/users/${user.id}/profiles`).set(auth(user)).send({
         name: 'Ana',
         gender: 'f',
         birthDate: '1990-05-10',
@@ -99,6 +133,7 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
 
       const response = await request(app.server)
         .patch(`/users/${user.id}/profiles`)
+        .set(auth(user))
         .send({ name: 'Ana Maria', gender: 'nb' });
 
       expect(response.status).toBe(200);
@@ -118,6 +153,7 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
 
       const response = await request(app.server)
         .patch(`/users/${user.id}/profiles`)
+        .set(auth(user))
         .send({ name: 'Ana Maria' });
 
       expect(response.status).toBe(404);
@@ -129,11 +165,14 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
     it('creates a migraine log for the user', async () => {
       const user = await createUser('logs-a@test.com');
 
-      const response = await request(app.server).post(`/users/${user.id}/migraine-logs`).send({
-        intensity: 6,
-        painLocation: 'frontal',
-        startedAt: '2026-01-01T10:00:00.000Z',
-      });
+      const response = await request(app.server)
+        .post(`/users/${user.id}/migraine-logs`)
+        .set(auth(user))
+        .send({
+          intensity: 6,
+          painLocation: 'frontal',
+          startedAt: '2026-01-01T10:00:00.000Z',
+        });
 
       expect(response.status).toBe(201);
       expect(response.body).toMatchObject({
@@ -148,11 +187,14 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
       const user = await createUser('logs-b@test.com');
       const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-      const response = await request(app.server).post(`/users/${user.id}/migraine-logs`).send({
-        intensity: 5,
-        painLocation: 'frontal',
-        startedAt: future,
-      });
+      const response = await request(app.server)
+        .post(`/users/${user.id}/migraine-logs`)
+        .set(auth(user))
+        .send({
+          intensity: 5,
+          painLocation: 'frontal',
+          startedAt: future,
+        });
 
       expect(response.status).toBe(400);
       expect(response.body).toMatchObject({ code: 'DOMAIN_VALIDATION_ERROR' });
@@ -165,6 +207,7 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
 
       const response = await request(app.server)
         .post(`/users/${user.id}/preventive-treatments`)
+        .set(auth(user))
         .send({ name: 'Propranolol' });
 
       expect(response.status).toBe(201);
@@ -182,6 +225,7 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
 
       const response = await request(app.server)
         .post(`/users/${user.id}/preventive-treatments`)
+        .set(auth(user))
         .send({ name: 'Topiramate', repeatUntil: future });
 
       expect(response.status).toBe(400);
@@ -192,13 +236,15 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
   describe('GET /users/:userId/calendar-view', () => {
     it('groups the user migraine logs by local date', async () => {
       const user = await createUser('calendar-a@test.com');
-      await request(app.server).post(`/users/${user.id}/migraine-logs`).send({
+      await request(app.server).post(`/users/${user.id}/migraine-logs`).set(auth(user)).send({
         intensity: 7,
         painLocation: 'occipital',
         startedAt: '2026-01-15T12:00:00.000Z',
       });
 
-      const response = await request(app.server).get(`/users/${user.id}/calendar-view`);
+      const response = await request(app.server)
+        .get(`/users/${user.id}/calendar-view`)
+        .set(auth(user));
 
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({
@@ -210,7 +256,9 @@ describe('HTTP endpoints (real Postgres via Docker)', () => {
     it('returns an empty calendar when the user has no logs', async () => {
       const user = await createUser('calendar-b@test.com');
 
-      const response = await request(app.server).get(`/users/${user.id}/calendar-view`);
+      const response = await request(app.server)
+        .get(`/users/${user.id}/calendar-view`)
+        .set(auth(user));
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ userId: user.id, months: [] });

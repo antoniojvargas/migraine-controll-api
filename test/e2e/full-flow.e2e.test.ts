@@ -65,14 +65,21 @@ describe('Full flow (API + Postgres + Mongo via docker-compose)', () => {
 
     const user = await dataSource.getRepository(UserEntity).findOneByOrFail({ externalId });
 
+    // El contenedor e2e corre con NODE_ENV=test, así que la API usa
+    // InsecureBearerSubVerifier: el token Bearer es el `sub` (== externalId).
+    const authHeader = `Bearer ${externalId}`;
+
     // 2. Creación de perfil, contra la API real levantada por docker-compose.
-    const profileResponse = await request(API_URL).post(`/users/${user.id}/profiles`).send({
-      name: 'Ana',
-      gender: 'f',
-      birthDate: '1990-05-10',
-      language: 'es',
-      geohash6: 'dzn6c6',
-    });
+    const profileResponse = await request(API_URL)
+      .post(`/users/${user.id}/profiles`)
+      .set('Authorization', authHeader)
+      .send({
+        name: 'Ana',
+        gender: 'f',
+        birthDate: '1990-05-10',
+        language: 'es',
+        geohash6: 'dzn6c6',
+      });
     expect(profileResponse.status).toBe(201);
     expect(profileResponse.body).toMatchObject({ userId: user.id, name: 'Ana' });
 
@@ -90,6 +97,7 @@ describe('Full flow (API + Postgres + Mongo via docker-compose)', () => {
 
     const onboardingResponse = await request(API_URL)
       .put(`/users/${user.id}/preferred-answers/${question.id}`)
+      .set('Authorization', authHeader)
       .send({ selectionId: selection.id });
     expect(onboardingResponse.status).toBe(200);
     expect(onboardingResponse.body).toMatchObject({ userId: user.id, selectionId: selection.id });
@@ -107,6 +115,7 @@ describe('Full flow (API + Postgres + Mongo via docker-compose)', () => {
     for (let i = 0; i < RECURRENCE_THRESHOLD; i += 1) {
       lastResponse = await request(API_URL)
         .post(`/users/${user.id}/migraine-logs`)
+        .set('Authorization', authHeader)
         .send({
           intensity: 6,
           painLocation: 'frontal',

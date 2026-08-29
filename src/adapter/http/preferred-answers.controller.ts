@@ -43,6 +43,14 @@ export const registerPreferredAnswersRoutes = (
   app: FastifyInstance,
   controller: PreferredAnswersController,
 ): void => {
-  app.get('/users/:userId/preferred-answers', controller.findByUser);
-  app.put('/users/:userId/preferred-answers/:questionId', controller.upsert);
+  app.get<{ Params: { userId: string } }>(
+    '/users/:userId/preferred-answers',
+    { onRequest: [app.authenticateOwner] },
+    controller.findByUser,
+  );
+  app.put<{ Params: { userId: string; questionId: string }; Body: unknown }>(
+    '/users/:userId/preferred-answers/:questionId',
+    { onRequest: [app.authenticateOwner] },
+    controller.upsert,
+  );
 };

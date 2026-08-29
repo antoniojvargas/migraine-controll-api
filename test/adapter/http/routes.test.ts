@@ -21,6 +21,10 @@ import { ProcessTerraWebhookUc } from '@/usecase/terra/process-terra-webhook.uc'
 describe('adapter/http routes', () => {
   const buildApp = (): FastifyInstance => {
     const app = Fastify({ logger: false });
+    // Auth se prueba en auth.test.ts + integración; aquí solo interesa el wiring
+    // de rutas, así que los guards son no-ops.
+    app.decorate('authenticate', async () => {});
+    app.decorate('authenticateOwner', async () => {});
     app.get('/health', async () => ({ status: 'ok' }));
     registerAppVersionRoutes(
       app,

@@ -46,6 +46,14 @@ export const registerProfileRoutes = (
   app: FastifyInstance,
   controller: ProfileController,
 ): void => {
-  app.post('/users/:userId/profiles', controller.create);
-  app.patch('/users/:userId/profiles', controller.update);
+  app.post<{ Params: { userId: string }; Body: Omit<CreateProfileDto, 'userId'> }>(
+    '/users/:userId/profiles',
+    { onRequest: [app.authenticateOwner] },
+    controller.create,
+  );
+  app.patch<{ Params: { userId: string }; Body: Omit<UpdateProfileInputDto, 'userId'> }>(
+    '/users/:userId/profiles',
+    { onRequest: [app.authenticateOwner] },
+    controller.update,
+  );
 };

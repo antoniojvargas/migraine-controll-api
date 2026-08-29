@@ -27,5 +27,12 @@ export const registerPreventiveTreatmentRoutes = (
   app: FastifyInstance,
   controller: PreventiveTreatmentController,
 ): void => {
-  app.post('/users/:userId/preventive-treatments', controller.create);
+  app.post<{
+    Params: { userId: string };
+    Body: Omit<CreatePreventiveTreatmentInputDto, 'userId'>;
+  }>(
+    '/users/:userId/preventive-treatments',
+    { onRequest: [app.authenticateOwner] },
+    controller.create,
+  );
 };
