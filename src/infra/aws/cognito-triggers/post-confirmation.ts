@@ -1,5 +1,6 @@
 import { dataSource } from '@/infra/database/dataSource';
 import { buildRepositories } from '@/factory/container';
+import { logger } from '@/config/logger';
 import { CognitoPostSignUpUc } from '@/usecase/cognito-post-sign-up.uc';
 import { PostConfirmationTriggerEvent } from './types';
 
@@ -16,13 +17,13 @@ export const handler = async (
     return event;
   }
 
-  console.log(
-    JSON.stringify({
-      msg: 'user confirmed sign up',
+  logger.info(
+    {
       userPoolId: event.userPoolId,
       userName: event.userName,
       email: event.request.userAttributes.email,
-    }),
+    },
+    'user confirmed sign up',
   );
 
   await ensureDataSourceInitialized();

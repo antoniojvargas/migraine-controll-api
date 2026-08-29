@@ -1,5 +1,6 @@
 import { dataSource } from '@/infra/database/dataSource';
 import { buildRepositories } from '@/factory/container';
+import { logger } from '@/config/logger';
 import { CognitoPostSignUpUc } from '@/usecase/cognito-post-sign-up.uc';
 import { CognitoPostSignInUc } from '@/usecase/cognito-post-sign-in.uc';
 import { PostAuthenticationTriggerEvent } from './types';
@@ -13,14 +14,14 @@ async function ensureDataSourceInitialized(): Promise<void> {
 export const handler = async (
   event: PostAuthenticationTriggerEvent,
 ): Promise<PostAuthenticationTriggerEvent> => {
-  console.log(
-    JSON.stringify({
-      msg: 'user authenticated',
+  logger.info(
+    {
       userPoolId: event.userPoolId,
       userName: event.userName,
       newDeviceUsed: event.request.newDeviceUsed ?? false,
       loggedInAt: new Date().toISOString(),
-    }),
+    },
+    'user authenticated',
   );
 
   await ensureDataSourceInitialized();
