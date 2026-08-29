@@ -8,38 +8,6 @@ import { createGenReqId, registerRequestContext } from '@/adapter/http/plugins/r
 import { registerCors, CorsOptions } from '@/adapter/http/plugins/cors';
 import { registerRateLimit, RateLimitOptions } from '@/adapter/http/plugins/rate-limit';
 import { registerDocs, DocsOptions } from '@/adapter/http/plugins/docs';
-import { AppVersionRepository } from '@/infra/database/repository/app-version.repository';
-import { PreferredAnswersRepository } from '@/infra/database/repository/preferred-answers.repository';
-import { AcuteTreatmentWorseFeedbackOptionsRepository } from '@/infra/database/repository/acute-treatment-worse-feedback-options.repository';
-import { ProfileRepository } from '@/infra/database/repository/profile.repository';
-import { MigraineLogRepository } from '@/infra/database/repository/migraine-log.repository';
-import { PreventiveTreatmentRepository } from '@/infra/database/repository/preventive-treatment.repository';
-import { UserResponseRepository } from '@/infra/database/repository/user-response.repository';
-import { QuestionRepository } from '@/infra/database/repository/question.repository';
-import { SelectionRepository } from '@/infra/database/repository/selection.repository';
-import { TranslationRepository } from '@/infra/database/repository/translation.repository';
-import { UserRepository } from '@/infra/database/repository/user.repository';
-import { PushNotificationTokenRepository } from '@/infra/database/repository/push-notification-token.repository';
-import { TerraUserRepository } from '@/infra/database/repository/terra-user.repository';
-import { TerraHealthDataRepository } from '@/infra/database/repository/terra-health-data.repository';
-import { TerraWebhookLogRepository } from '@/infra/database/repository/terra-webhook-log.repository';
-import { AppVersionEntity } from '@/infra/database/entities/app-version.entity';
-import { PreferredAnswersEntity } from '@/infra/database/entities/preferred-answers.entity';
-import { AcuteTreatmentWorseFeedbackOptionsEntity } from '@/infra/database/entities/acute-treatment-worse-feedback-options.entity';
-import {
-  ProfileEntity,
-  MigraineLogEntity,
-  PreventiveTreatmentEntity,
-  UserResponseEntity,
-  QuestionEntity,
-  SelectionEntity,
-  TranslationEntity,
-  UserEntity,
-  PushNotificationTokenEntity,
-  TerraUserEntity,
-  TerraHealthDataEntity,
-  TerraWebhookLogEntity,
-} from '@/infra/database/entities';
 import { s3Client } from '@/infra/aws/s3Client';
 import { DatabaseDataProcessor } from '@/infra/processors/database-data-processor';
 import { S3DataProcessor } from '@/infra/processors/s3-data-processor';
@@ -63,6 +31,7 @@ import { CreatePreventiveTreatmentUc } from '@/usecase/create-preventive-treatme
 import { FindCalendarViewUc } from '@/usecase/find-calendar-view.uc';
 import { CognitoDeleteUserUc } from '@/usecase/cognito-delete-user.uc';
 import { ProcessTerraWebhookUc } from '@/usecase/terra/process-terra-webhook.uc';
+import { buildRepositories } from '@/factory/container';
 import {
   AppVersionController,
   registerAppVersionRoutes,
@@ -120,41 +89,8 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
 
   const dataSource = options.dataSource;
   if (dataSource !== undefined) {
-    const appVersionRepository = new AppVersionRepository(
-      dataSource.getRepository(AppVersionEntity),
-    );
-    const preferredAnswersRepository = new PreferredAnswersRepository(
-      dataSource.getRepository(PreferredAnswersEntity),
-    );
-    const feedbackOptionsRepository = new AcuteTreatmentWorseFeedbackOptionsRepository(
-      dataSource.getRepository(AcuteTreatmentWorseFeedbackOptionsEntity),
-    );
-    const profileRepository = new ProfileRepository(dataSource.getRepository(ProfileEntity));
-    const migraineLogRepository = new MigraineLogRepository(
-      dataSource.getRepository(MigraineLogEntity),
-    );
-    const pushNotificationTokenRepository = new PushNotificationTokenRepository(
-      dataSource.getRepository(PushNotificationTokenEntity),
-    );
-    const preventiveTreatmentRepository = new PreventiveTreatmentRepository(
-      dataSource.getRepository(PreventiveTreatmentEntity),
-    );
-    const userResponseRepository = new UserResponseRepository(
-      dataSource.getRepository(UserResponseEntity),
-    );
-    const questionRepository = new QuestionRepository(dataSource.getRepository(QuestionEntity));
-    const selectionRepository = new SelectionRepository(dataSource.getRepository(SelectionEntity));
-    const translationRepository = new TranslationRepository(
-      dataSource.getRepository(TranslationEntity),
-    );
-    const userRepository = new UserRepository(dataSource.getRepository(UserEntity));
-    const terraUserRepository = new TerraUserRepository(dataSource.getRepository(TerraUserEntity));
-    const terraHealthDataRepository = new TerraHealthDataRepository(
-      dataSource.getRepository(TerraHealthDataEntity),
-    );
-    const terraWebhookLogRepository = new TerraWebhookLogRepository(
-      dataSource.getRepository(TerraWebhookLogEntity),
-    );
+    const repos = buildRepositories(dataSource);
+
     const legacyUserPoolId =
       envs.COGNITO_LEGACY_USER_POOL_ID === '' ? undefined : envs.COGNITO_LEGACY_USER_POOL_ID;
     const cognitoClient = new CognitoIdentityProviderClient({ region: envs.AWS_REGION });
@@ -174,43 +110,40 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
     const cognitoUpdateUserAttributesUc = new CognitoUpdateUserAttributesUc(
       cognitoIdentityProvider,
     );
-    registerAuth(app, cognitoJwtVerifier, userRepository);
+    registerAuth(app, cognitoJwtVerifier, repos.user);
 
-    registerAppVersionRoutes(
-      app,
-      new AppVersionController(new FindAppVersionUc(appVersionRepository)),
-    );
+    registerAppVersionRoutes(app, new AppVersionController(new FindAppVersionUc(repos.appVersion)));
     registerPreferredAnswersRoutes(
       app,
       new PreferredAnswersController(
-        new UpsertPreferredAnswerUc(preferredAnswersRepository),
-        new FindPreferredAnswersByUserUc(preferredAnswersRepository),
+        new UpsertPreferredAnswerUc(repos.preferredAnswers),
+        new FindPreferredAnswersByUserUc(repos.preferredAnswers),
       ),
     );
     registerAcuteTreatmentFeedbackRoutes(
       app,
       new AcuteTreatmentFeedbackController(
-        new FindAcuteTreatmentWorseFeedbackOptionsUc(feedbackOptionsRepository),
+        new FindAcuteTreatmentWorseFeedbackOptionsUc(repos.acuteTreatmentWorseFeedbackOptions),
       ),
     );
     registerProfileRoutes(
       app,
       new ProfileController(
-        new CreateProfileUc(profileRepository),
-        new UpdateProfileUc(profileRepository, cognitoUpdateUserAttributesUc),
+        new CreateProfileUc(repos.profile),
+        new UpdateProfileUc(repos.profile, cognitoUpdateUserAttributesUc),
       ),
     );
     registerMigraineLogRoutes(
       app,
       new MigraineLogController(
         new CreateMigraineLogUc(
-          migraineLogRepository,
-          preferredAnswersRepository,
-          userResponseRepository,
-          questionRepository,
-          selectionRepository,
-          translationRepository,
-          pushNotificationTokenRepository,
+          repos.migraineLog,
+          repos.preferredAnswers,
+          repos.userResponse,
+          repos.question,
+          repos.selection,
+          repos.translation,
+          repos.pushNotificationToken,
         ),
       ),
     );
@@ -218,26 +151,26 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
       app,
       new PreventiveTreatmentController(
         new CreatePreventiveTreatmentUc(
-          preventiveTreatmentRepository,
-          preferredAnswersRepository,
-          userResponseRepository,
-          questionRepository,
-          selectionRepository,
-          translationRepository,
+          repos.preventiveTreatment,
+          repos.preferredAnswers,
+          repos.userResponse,
+          repos.question,
+          repos.selection,
+          repos.translation,
         ),
       ),
     );
     registerCalendarViewRoutes(
       app,
-      new CalendarViewController(new FindCalendarViewUc(migraineLogRepository)),
+      new CalendarViewController(new FindCalendarViewUc(repos.migraineLog)),
     );
     registerUserRoutes(
       app,
-      new UserController(new CognitoDeleteUserUc(userRepository, cognitoUserDirectory)),
+      new UserController(new CognitoDeleteUserUc(repos.user, cognitoUserDirectory)),
     );
 
     const multiDestinationDataProcessor = new MultiDestinationDataProcessor([
-      new DatabaseDataProcessor(terraUserRepository, terraHealthDataRepository),
+      new DatabaseDataProcessor(repos.terraUser, repos.terraHealthData),
       new S3DataProcessor(s3Client, envs.TERRA_RAW_PAYLOADS_BUCKET),
       new DocumentDBDataProcessor(s3Client, {
         enabled: envs.DOCUMENTDB_ENABLED,
@@ -251,7 +184,7 @@ export const buildApp = (options: BuildAppOptions = {}): FastifyInstance => {
     registerTerraRoutes(
       app,
       new TerraController(
-        new ProcessTerraWebhookUc(terraWebhookLogRepository, multiDestinationDataProcessor),
+        new ProcessTerraWebhookUc(repos.terraWebhookLog, multiDestinationDataProcessor),
       ),
     );
   }
