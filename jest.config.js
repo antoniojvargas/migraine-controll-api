@@ -5,7 +5,7 @@ module.exports = {
   rootDir: '.',
   roots: ['<rootDir>/src', '<rootDir>/test'],
   testMatch: ['**/*.test.ts', '**/*.spec.ts'],
-  testPathIgnorePatterns: ['/node_modules/', '/test/integration/'],
+  testPathIgnorePatterns: ['/node_modules/', '/test/integration/', '/test/e2e/'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
