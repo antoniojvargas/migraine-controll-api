@@ -1,7 +1,5 @@
 import { DeepPartial } from 'typeorm';
 import { MigraineLog } from '@/domain/migraine-log';
-import { Question } from '@/domain/question';
-import { UserResponse } from '@/domain/user-response';
 import { MigraineLogRepository } from '@/infra/database/repository/migraine-log.repository';
 import { PreferredAnswersRepository } from '@/infra/database/repository/preferred-answers.repository';
 import { UserResponseRepository } from '@/infra/database/repository/user-response.repository';
@@ -9,20 +7,19 @@ import { QuestionRepository } from '@/infra/database/repository/question.reposit
 import { SelectionRepository } from '@/infra/database/repository/selection.repository';
 import { TranslationRepository } from '@/infra/database/repository/translation.repository';
 import { PushNotificationTokenRepository } from '@/infra/database/repository/push-notification-token.repository';
-import { MigraineLogEntity, UserResponseEntity } from '@/infra/database/entities';
+import { MigraineLogEntity } from '@/infra/database/entities';
 import { CreateMigraineLogInputDto } from '@/dto/create-migraine-log-input.dto';
 import { MigraineLogOutputDto, RecurrentSymptomOutputDto } from '@/dto/migraine-log-output.dto';
 import { handleErrorResponse } from '@/utils/handle-error-response';
 import { notifyUsers } from './notification/notificationHelpers';
 import { UseCaseInterface } from './usecase.interface';
-import { UserResponseBaseUc, ResolvedAnswer } from './user-response-base.uc';
+import { UserResponseBaseUc } from './user-response-base.uc';
 
 export class CreateMigraineLogUc
   extends UserResponseBaseUc
   implements UseCaseInterface<CreateMigraineLogInputDto, MigraineLogOutputDto>
 {
   private readonly migraineLogRepository: MigraineLogRepository;
-  private readonly preferredAnswersRepository: PreferredAnswersRepository;
   private readonly pushNotificationTokenRepository: PushNotificationTokenRepository;
 
   constructor(
@@ -34,9 +31,14 @@ export class CreateMigraineLogUc
     translationRepository: TranslationRepository,
     pushNotificationTokenRepository: PushNotificationTokenRepository,
   ) {
-    super(userResponseRepository, questionRepository, selectionRepository, translationRepository);
+    super(
+      userResponseRepository,
+      questionRepository,
+      selectionRepository,
+      translationRepository,
+      preferredAnswersRepository,
+    );
     this.migraineLogRepository = migraineLogRepository;
-    this.preferredAnswersRepository = preferredAnswersRepository;
     this.pushNotificationTokenRepository = pushNotificationTokenRepository;
   }
 
@@ -47,31 +49,12 @@ export class CreateMigraineLogUc
       const persistedLog = await this.migraineLogRepository.create(this.mapLogToEntity(log));
       log.assignId(persistedLog.id);
 
-      const questionCache = new Map<string, Question>();
-      const domainResponses: UserResponse[] = [];
-      const responseEntities: DeepPartial<UserResponseEntity>[] = [];
-      for (const item of responses) {
-        const question = await this.loadQuestion(item.questionId, questionCache);
-        const resolved = await this.resolveAnswer(
-          question,
-          item.answerId,
-          item.answerText,
-          item.answerLanguageCode,
-        );
-        const response = this.buildUserResponse(
-          log.userId,
-          question,
-          resolved,
-          persistedLog.id,
-          undefined,
-        );
-        domainResponses.push(response);
-        responseEntities.push(this.mapUserResponseToEntity(response));
-        await this.upsertPreferredAnswer(log.userId, question.id as string, resolved);
-      }
-
-      const persistedResponses = await this.userResponseRepository.bulkCreate(responseEntities);
-      persistedResponses.forEach((entity, index) => domainResponses[index].assignId(entity.id));
+      const domainResponses = await this.persistUserResponses({
+        userId: log.userId,
+        items: responses,
+        migraineLogId: persistedLog.id,
+        upsertPreferred: true,
+      });
 
       const recurrentSymptoms = await this.detectRecurrentSymptoms(log.userId);
       await this.onRecurrentSymptomsDetected(recurrentSymptoms, log.userId);
@@ -147,25 +130,5 @@ export class CreateMigraineLogUc
       startedAt: log.startedAt,
       endedAt: log.endedAt,
     };
-  }
-
-  private async upsertPreferredAnswer(
-    userId: string,
-    questionId: string,
-    resolved: ResolvedAnswer,
-  ): Promise<void> {
-    const existing = await this.preferredAnswersRepository.findOneBy({
-      user: { id: userId },
-      question: { id: questionId },
-    });
-    if (existing !== null) {
-      return;
-    }
-    await this.preferredAnswersRepository.create({
-      user: { id: userId },
-      question: { id: questionId },
-      selection: resolved.selectionId !== null ? { id: resolved.selectionId } : undefined,
-      answerText: resolved.answerText,
-    });
   }
 }

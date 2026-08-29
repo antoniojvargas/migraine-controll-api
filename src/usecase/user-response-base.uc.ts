@@ -11,6 +11,7 @@ import { UserResponseRepository } from '@/infra/database/repository/user-respons
 import { QuestionRepository } from '@/infra/database/repository/question.repository';
 import { SelectionRepository } from '@/infra/database/repository/selection.repository';
 import { TranslationRepository } from '@/infra/database/repository/translation.repository';
+import { PreferredAnswersRepository } from '@/infra/database/repository/preferred-answers.repository';
 import { UserResponseEntity, SelectionEntity, TranslationEntity } from '@/infra/database/entities';
 import { UserResponseOutputDto } from '@/dto/user-response-output.dto';
 import { AppError } from '@/utils/app-error';
@@ -20,12 +21,27 @@ export interface ResolvedAnswer {
   answerText: string | null;
 }
 
+export interface PersistUserResponsesInput {
+  userId: string;
+  items: ReadonlyArray<{
+    questionId: string;
+    answerId?: string | null;
+    answerText?: string | null;
+    answerLanguageCode?: string;
+  }>;
+  migraineLogId?: string | null;
+  preventiveTreatmentId?: string | null;
+  /** Si es `true`, cada respuesta resuelta se fija como respuesta preferida del usuario cuando aún no tiene una para esa pregunta. */
+  upsertPreferred?: boolean;
+}
+
 export abstract class UserResponseBaseUc {
   constructor(
     protected readonly userResponseRepository: UserResponseRepository,
     protected readonly questionRepository: QuestionRepository,
     protected readonly selectionRepository: SelectionRepository,
     protected readonly translationRepository: TranslationRepository,
+    protected readonly preferredAnswersRepository?: PreferredAnswersRepository,
   ) {}
 
   protected async loadQuestion(
@@ -125,6 +141,81 @@ export abstract class UserResponseBaseUc {
       migraineLogId: response.migraineLogId,
       preventiveTreatmentId: response.preventiveTreatmentId,
     };
+  }
+
+  /**
+   * Resuelve y persiste en bloque un conjunto de respuestas de un usuario
+   * (onboarding, log de migraña o tratamiento preventivo). Devuelve las
+   * entidades de dominio con su id ya asignado. Reemplaza el bucle
+   * loadQuestion → resolveAnswer → buildUserResponse → bulkCreate → assignId
+   * que estaba duplicado en tres casos de uso.
+   */
+  protected async persistUserResponses(input: PersistUserResponsesInput): Promise<UserResponse[]> {
+    const {
+      userId,
+      items,
+      migraineLogId = null,
+      preventiveTreatmentId = null,
+      upsertPreferred = false,
+    } = input;
+
+    const questionCache = new Map<string, Question>();
+    const domainResponses: UserResponse[] = [];
+    const entities: DeepPartial<UserResponseEntity>[] = [];
+
+    for (const item of items) {
+      const question = await this.loadQuestion(item.questionId, questionCache);
+      const resolved = await this.resolveAnswer(
+        question,
+        item.answerId,
+        item.answerText,
+        item.answerLanguageCode,
+      );
+      const response = this.buildUserResponse(
+        userId,
+        question,
+        resolved,
+        migraineLogId,
+        preventiveTreatmentId,
+      );
+      domainResponses.push(response);
+      entities.push(this.mapUserResponseToEntity(response));
+      if (upsertPreferred) {
+        await this.upsertPreferredAnswerIfAbsent(userId, question.id as string, resolved);
+      }
+    }
+
+    const persisted = await this.userResponseRepository.bulkCreate(entities);
+    persisted.forEach((entity, index) => domainResponses[index].assignId(entity.id));
+    return domainResponses;
+  }
+
+  /**
+   * Fija `resolved` como respuesta preferida del usuario para `questionId` si
+   * todavía no tiene una. Requiere que el caso de uso haya inyectado un
+   * `preferredAnswersRepository`.
+   */
+  protected async upsertPreferredAnswerIfAbsent(
+    userId: string,
+    questionId: string,
+    resolved: ResolvedAnswer,
+  ): Promise<void> {
+    if (this.preferredAnswersRepository === undefined) {
+      throw new Error('preferredAnswersRepository is required to upsert preferred answers');
+    }
+    const existing = await this.preferredAnswersRepository.findOneBy({
+      user: { id: userId },
+      question: { id: questionId },
+    });
+    if (existing !== null) {
+      return;
+    }
+    await this.preferredAnswersRepository.create({
+      user: { id: userId },
+      question: { id: questionId },
+      selection: resolved.selectionId !== null ? { id: resolved.selectionId } : undefined,
+      answerText: resolved.answerText,
+    });
   }
 
   private async createCustomSelection(
